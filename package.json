@@ -1,22 +1,28 @@
 {
-  "name": "homebridge-plugin-name",
-  "displayName": "Plugin Name",
+  "name": "homebridge-denon-telnet",
+  "displayName": "Homebridge Denon Telnet",
   "type": "module",
-  "version": "1.0.0",
-  "private": true,
-  "description": "A short description about what your plugin does.",
-  "author": "Your Name",
-  "license": "Apache-2.0",
-  "homepage": "https://github.com/USERNAME/GITHUB_PROJECT_NAME#readme",
+  "version": "0.1.1",
+  "description": "Control your Denon speakers via Telnet.",
+  "author": "hov3rcraft",
+  "license": "MIT",
+  "homepage": "https://github.com/hov3rcraft/homebridge-denon-telnet#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "https://github.com/hov3rcraft/homebridge-denon-telnet.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/hov3rcraft/homebridge-denon-telnet/issues"
   },
   "keywords": [
-    "homebridge-plugin"
+    "homebridge",
+    "homebridge-plugin",
+    "denon",
+    "heos",
+    "avr",
+    "speaker",
+    "ceol",
+    "telnet"
   ],
   "main": "dist/index.js",
   "engines": {
@@ -41,7 +47,5 @@
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.12.2"
   },
-  "dependencies": {
-    "homebridge-lib": "^7.1.0"
-  }
+  "dependencies": {}
 }

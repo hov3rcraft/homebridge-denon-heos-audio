@@ -1,16 +1,58 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "DenonTelnet",
   "pluginType": "platform",
+  "headerDisplay": "Configure your Denon devices here.",
   "singular": true,
-  "strictValidation": false,
+  "strictValidation": true,
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
+      "devices": {
+        "title": "Devices",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "default": "Denon Speaker",
+              "required": true
+            },
+            "deviceId": {
+              "title": "Device ID",
+              "type": "string",
+              "required": true
+            },
+            "deviceIp": {
+              "title": "Device IP",
+              "description": "Assign your device a static IP address an enter it here.",
+              "type": "string",
+              "required": false
+            }
+          }
+        }
+      },
+      "consoleLogEnabled": {
+        "title": "Console Log",
+        "description": "Diverts the log messages directly to the console. This is only intended for debugging purposes.",
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "consoleLogLevel": {
+        "title": "Log Level",
+        "description": "If console log is enabled, only log messages at this log level or below it will be displayed in the console.",
         "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+        "enum": [
+          "error",
+          "warn",
+          "success",
+          "info",
+          "debug"
+        ],
+        "required": false,
+        "default": "debug"
       }
     }
   }
