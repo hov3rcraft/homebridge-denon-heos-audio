@@ -48,6 +48,7 @@
     "typescript-eslint": "^8.12.2"
   },
   "dependencies": {
-    "@achingbrain/ssdp": "^4.2.1"
+    "@achingbrain/ssdp": "^4.2.1",
+    "@xmldom/xmldom": "^0.9.7"
   }
 }

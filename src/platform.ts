@@ -1,8 +1,8 @@
 import type { API, Characteristic, DynamicPlatformPlugin, Logger, LogLevel, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
+import ssdp from '@achingbrain/ssdp';
 
 import { DenonTelnetAccessory } from './platformAccessory.js';
 import { ConsoleLogger } from './consoleLogger.js';
-import { discoverSsdpDevices } from './discoverSsdpDevices.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 
 export class DenonTelnetPlatform implements DynamicPlatformPlugin {
@@ -15,7 +15,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: Map<string, PlatformAccessory> = new Map();
-  public readonly discoveredCacheUUIDs: string[] = [];
+  public readonly ssdpDiscoveredDevices = new Map<string, any>();
 
   constructor(log: Logger, config: PlatformConfig, api: API,) {
     this.log = config.consoleLogEnabled ? new ConsoleLogger(ConsoleLogger.logLevelFromString[config.consoleLogLevel], "homebridge-eufy-robovac:") : log;
@@ -51,7 +51,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
 
   discoverDevices() {
     if (this.config.deviceDiscovery) {
-      discoverSsdpDevices(this.log);
+      this.discoverSsdpDevices(this.log);
     }
 
     // loop over the configured devices and register each one if it has not already been registered
@@ -100,6 +100,51 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
+    }
+  }
+
+  async discoverSsdpDevices(log: Logger) {
+    const bus = await ssdp();
+
+    for await (const service of bus.discover()) {
+      const serial = service.details?.device?.serialNumber;
+
+      if (!serial) {
+        continue;
+      }
+
+      if (this.ssdpDiscoveredDevices.has(serial)) {
+        continue;
+      }
+
+      this.ssdpDiscoveredDevices.set(serial, service);
+
+      if (!JSON.stringify(service).toLowerCase().includes("denon")) {
+        continue;
+      }
+
+      if (!service.location?.href) {
+        continue;
+      }
+
+      try {
+        const response = await fetch(service.location.href);
+        if (!response.ok) {
+          log.debug(`Received a non-200 status code while connecting to a new device's location href (status code: ${response.status}).`);
+          continue;
+        }
+      } catch (error) {
+        log.debug("An error occured while connecting to a new device's location href.", error);
+        continue;
+      }
+
+      log.success('---------------------------------------------------------');
+      log.success('Found DENON device in local network:');
+      log.success('Friendly name:', service.details?.device?.friendlyName);
+      log.success('Model name:   ', service.details?.device?.modelName);
+      log.success('Serial number:', serial);
+      log.success('IP address:   ', service.location?.hostname);
+      log.success('---------------------------------------------------------');
     }
   }
 }
