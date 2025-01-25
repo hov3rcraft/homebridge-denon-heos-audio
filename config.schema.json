@@ -1,14 +1,21 @@
 {
   "pluginAlias": "DenonTelnet",
   "pluginType": "platform",
-  "headerDisplay": "Configure your Denon devices here.",
   "singular": true,
   "strictValidation": true,
   "schema": {
     "type": "object",
     "properties": {
+      "deviceDiscovery": {
+        "title": "Device Discovery",
+        "description": "Enable to automatically discover Denon devices on your network. (Found devices will be listed in the homebridge log after the plugin has started. Ensure that your homebridge's log level is at least set to 'info' or enable the debug log below.)",
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
       "devices": {
         "title": "Devices",
+        "description": "Add your Denon devices here.",
         "type": "array",
         "items": {
           "type": "object",
@@ -19,14 +26,14 @@
               "default": "Denon Speaker",
               "required": true
             },
-            "deviceId": {
-              "title": "Device ID",
+            "serialNumber": {
+              "title": "Serial Number",
               "type": "string",
               "required": true
             },
-            "deviceIp": {
-              "title": "Device IP",
-              "description": "Assign your device a static IP address an enter it here.",
+            "ip": {
+              "title": "IP Address",
+              "description": "If your device has a static IP address, you can enter it here.",
               "type": "string",
               "required": false
             }

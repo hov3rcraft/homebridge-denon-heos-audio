@@ -2,6 +2,7 @@ import type { API, Characteristic, DynamicPlatformPlugin, Logger, LogLevel, Plat
 
 import { DenonTelnetAccessory } from './platformAccessory.js';
 import { ConsoleLogger } from './consoleLogger.js';
+import { discoverSsdpDevices } from './discoverSsdpDevices.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 
 export class DenonTelnetPlatform implements DynamicPlatformPlugin {
@@ -49,13 +50,17 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
   }
 
   discoverDevices() {
+    if (this.config.deviceDiscovery) {
+      discoverSsdpDevices(this.log);
+    }
+
     // loop over the configured devices and register each one if it has not already been registered
     for (const deviceConfig of this.config.devices) {
 
       // generate a unique id for the accessory this should be generated from
       // something globally unique, but constant, for example, the device serial
       // number or MAC address
-      const uuid = this.api.hap.uuid.generate(deviceConfig.deviceId);
+      const uuid = this.api.hap.uuid.generate(deviceConfig.serialNumber);
 
       // see if an accessory with the same uuid has already been registered and restored from
       // the cached devices we stored in the `configureAccessory` method above
