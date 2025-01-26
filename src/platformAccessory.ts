@@ -26,14 +26,6 @@ export class DenonTelnetAccessory {
   private readonly ip: string;
   private readonly serialNumber: string;
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false
-  };
-
   constructor(platform: DenonTelnetPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
     log.debug('Initializing DenonTelnetAccessory...');
 

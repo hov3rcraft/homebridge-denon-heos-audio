@@ -55,12 +55,13 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
       this.discoverSsdpDevices(this.log);
     }
 
+    let existingAccessoriesUuids = Array.from(this.accessories.keys());
+
     // loop over the configured devices and register each one if it has not already been registered
     for (const deviceConfig of this.config.devices) {
 
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
+      // generate a unique id for the accessory this should be generated from something globally unique, 
+      // but constant, for example, the device serial number or MAC address
       const uuid = this.api.hap.uuid.generate(deviceConfig.serialNumber);
 
       // see if an accessory with the same uuid has already been registered and restored from
@@ -71,18 +72,11 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         // the accessory already exists
         this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
 
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
-
         // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
         new DenonTelnetAccessory(this, existingAccessory, deviceConfig, this.log);
 
-        // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-        // remove platform accessories when no longer present
-        // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-        // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
+        // after it has been restored, the existing accessory should be removed form the uuid list
+        existingAccessoriesUuids = existingAccessoriesUuids.filter(uuid => uuid !== existingAccessory.UUID);
       } else {
         // the accessory does not yet exist, so we need to create it
         this.log.info('Adding new accessory:', deviceConfig.name);
@@ -95,11 +89,19 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         accessory.context.device = deviceConfig;
 
         // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
         new DenonTelnetAccessory(this, accessory, deviceConfig, this.log);
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+    }
+
+    // remove platform accessories from cache when no longer present
+    for (const uuid of existingAccessoriesUuids) {
+      const existingAccessory = this.accessories.get(uuid);
+      if (existingAccessory) {
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+        this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
       }
     }
   }
@@ -139,7 +141,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         continue;
       }
 
-      log.success('Check telnet support for:', service.location.hostname);
+      log.debug('Checking telnet support for:', service.location.hostname);
       const supportedModes = await checkTelnetSupport(service.location.hostname);
       if (supportedModes.length === 0) {
         continue;
