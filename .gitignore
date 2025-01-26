@@ -129,6 +129,7 @@ dist
 
 ### VisualStudioCode ###
 .vscode/*
+*.code-workspace
 
 # playground
 src/playground.ts

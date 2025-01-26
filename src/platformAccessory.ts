@@ -3,6 +3,8 @@ import type { CharacteristicValue, Logger, PlatformAccessory, Service } from 'ho
 import type { DenonTelnetPlatform } from './platform.js';
 
 import { DOMParser } from '@xmldom/xmldom'
+import { DenonTelnetClient } from './denonTelnetClient.js';
+import { PromiseTimeoutException } from './promiseTimeoutException.js';
 
 /**
  * Platform Accessory
@@ -10,8 +12,13 @@ import { DOMParser } from '@xmldom/xmldom'
  * Each accessory may expose multiple services of different service types.
  */
 export class DenonTelnetAccessory {
+  private static readonly CALLBACK_TIMEOUT = 2500;
+  private static readonly TELNET_CONNECTION_TIMEOUT = 60000;
+  private static readonly TELNET_PORT = 23;
+
   private readonly platform: DenonTelnetPlatform;
   private readonly accessory: PlatformAccessory;
+  private readonly telnetClient: DenonTelnetClient;
   private readonly informationService: Service;
   private readonly switchService: Service;
   private readonly log: Logger;
@@ -55,6 +62,18 @@ export class DenonTelnetAccessory {
       .onGet(this.getOn.bind(this))
       .onSet(this.setOn.bind(this));
 
+    this.telnetClient = new DenonTelnetClient(
+      this.ip,
+      DenonTelnetAccessory.TELNET_PORT,
+      DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+      (power: boolean) => {
+        this.switchService.updateCharacteristic(this.platform.Characteristic.On, power
+
+        );
+      },
+      this.log.debug.bind(this.log)
+    );
+
     this.log.info('Finished initializing accessory:', this.name);
   }
 
@@ -92,15 +111,21 @@ export class DenonTelnetAccessory {
    * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
    */
   async getOn(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
+    this.log.debug(`getPower for ${this.name}`);
 
-    this.platform.log.debug('Get Characteristic On ->', isOn);
-
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-    return isOn;
+    try {
+      return await Promise.race([
+        this.telnetClient.getPower(),
+        new Promise<boolean>((resolve, reject) => {
+          setTimeout(() => reject(new PromiseTimeoutException(DenonTelnetAccessory.CALLBACK_TIMEOUT)), DenonTelnetAccessory.CALLBACK_TIMEOUT);
+        })
+      ]);
+    } catch (error) {
+      if (!(error instanceof PromiseTimeoutException)) {
+        this.log.error(`An error occured while getting power status for ${this.name}.`, error);
+      }
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
   getManufacturer(): CharacteristicValue {
@@ -115,11 +140,22 @@ export class DenonTelnetAccessory {
    * Handle "SET" requests from HomeKit
    * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
    */
-  async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+  async setOn(state: CharacteristicValue) {
+    this.log.debug(`setPower for ${this.name} set to ${state}`);
 
-    this.platform.log.debug('Set Characteristic On ->', value);
+    try {
+      return await Promise.race([
+        this.telnetClient.setPower(state as boolean),
+        new Promise<void>((resolve, reject) => {
+          setTimeout(() => reject(new PromiseTimeoutException(DenonTelnetAccessory.CALLBACK_TIMEOUT)), DenonTelnetAccessory.CALLBACK_TIMEOUT);
+        })
+      ]);
+    } catch (error) {
+      if (!(error instanceof PromiseTimeoutException)) {
+        this.log.error(`An error occured while setting power status for ${this.name}.`, error);
+      }
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
   setIdentify(value: any) {
