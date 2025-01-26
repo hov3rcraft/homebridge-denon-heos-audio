@@ -1,6 +1,11 @@
 import { Telnet } from 'telnet-client';
 import { Mutex } from 'async-mutex';
+import * as net from 'net';
 
+export enum DenonTelnetMode {
+    CLASSIC = 23,
+    HEOSCLI = 1255
+}
 
 export class DenonTelnetClient {
     private static readonly COMMANDS = {
@@ -26,10 +31,10 @@ export class DenonTelnetClient {
     private powerUpdateCallback;
     private debugLogCallback;
 
-    constructor(host: string, port: number = 23, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+    constructor(host: string, mode: DenonTelnetMode, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         this.params = {
             host: host,
-            port: port,
+            port: mode,
             timeout: timeout,
             negotiationMandatory: false,
             irs: '\r',
@@ -181,4 +186,38 @@ class ConnectionTimeoutException extends Error {
         // Ensure the prototype chain is correctly set for instanceof checks
         Object.setPrototypeOf(this, InvalidResponseException.prototype);
     }
+}
+
+function checkTelnetAtPort(host: string, port: number): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        const socket = net.connect(port, host, () => {
+            // If the connection is successful
+            socket.end(); // Close the connection
+            resolve(true); // Telnet is supported
+        });
+
+        socket.on('error', (err) => {
+            console.error(`Failed to connect to ${host}:${port}`, err.message);
+            resolve(false); // Telnet is not supported or some error occurred
+        });
+
+        socket.on('timeout', () => {
+            console.error(`Connection to ${host}:${port} timed out.`);
+            socket.end(); // Close the connection
+            resolve(false); // Telnet is not supported
+        });
+
+        socket.setTimeout(5000); // Set timeout to 5 seconds
+    });
+}
+
+export async function checkTelnetSupport(host: string): Promise<DenonTelnetMode[]> {
+    let supportedModes = [];
+    for (const mode of Object.values(DenonTelnetMode).filter(value => typeof value === 'number')) {
+        let supported = await checkTelnetAtPort(host, mode);
+        if (supported) {
+            supportedModes.push(mode);
+        }
+    }
+    return supportedModes;
 }

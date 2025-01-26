@@ -3,7 +3,7 @@ import type { CharacteristicValue, Logger, PlatformAccessory, Service } from 'ho
 import type { DenonTelnetPlatform } from './platform.js';
 
 import { DOMParser } from '@xmldom/xmldom'
-import { DenonTelnetClient } from './denonTelnetClient.js';
+import { DenonTelnetClient, DenonTelnetMode } from './denonTelnetClient.js';
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
 
 /**
@@ -14,7 +14,6 @@ import { PromiseTimeoutException } from './promiseTimeoutException.js';
 export class DenonTelnetAccessory {
   private static readonly CALLBACK_TIMEOUT = 2500;
   private static readonly TELNET_CONNECTION_TIMEOUT = 60000;
-  private static readonly TELNET_PORT = 23;
 
   private readonly platform: DenonTelnetPlatform;
   private readonly accessory: PlatformAccessory;
@@ -64,7 +63,7 @@ export class DenonTelnetAccessory {
 
     this.telnetClient = new DenonTelnetClient(
       this.ip,
-      DenonTelnetAccessory.TELNET_PORT,
+      DenonTelnetMode.CLASSIC,
       DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
       (power: boolean) => {
         this.switchService.updateCharacteristic(this.platform.Characteristic.On, power
@@ -101,8 +100,8 @@ export class DenonTelnetAccessory {
           };
         });
       })
-      .catch(error => {
-        this.log.error(`An error occured while connecting to a ${this.name}'s location href.`, error);
+      .catch(() => {
+        this.log.warn(`An error occured while connecting to ${this.name}'s location href.`);
       });
   }
 
@@ -121,7 +120,9 @@ export class DenonTelnetAccessory {
         })
       ]);
     } catch (error) {
-      if (!(error instanceof PromiseTimeoutException)) {
+      if ((error instanceof PromiseTimeoutException)) {
+        this.log.warn(`${this.name} seems to be unresponsive.`);
+      } else {
         this.log.error(`An error occured while getting power status for ${this.name}.`, error);
       }
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -151,7 +152,9 @@ export class DenonTelnetAccessory {
         })
       ]);
     } catch (error) {
-      if (!(error instanceof PromiseTimeoutException)) {
+      if ((error instanceof PromiseTimeoutException)) {
+        this.log.warn(`${this.name} seems to be unresponsive.`);
+      } else {
         this.log.error(`An error occured while setting power status for ${this.name}.`, error);
       }
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);

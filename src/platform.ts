@@ -4,6 +4,7 @@ import ssdp from '@achingbrain/ssdp';
 import { DenonTelnetAccessory } from './platformAccessory.js';
 import { ConsoleLogger } from './consoleLogger.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
+import { checkTelnetSupport, DenonTelnetMode } from './denonTelnetClient.js';
 
 export class DenonTelnetPlatform implements DynamicPlatformPlugin {
   public readonly log: Logger
@@ -123,7 +124,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         continue;
       }
 
-      if (!service.location?.href) {
+      if (!service.location.href) {
         continue;
       }
 
@@ -138,12 +139,19 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         continue;
       }
 
+      log.success('Check telnet support for:', service.location.hostname);
+      const supportedModes = await checkTelnetSupport(service.location.hostname);
+      if (supportedModes.length === 0) {
+        continue;
+      }
+
       log.success('---------------------------------------------------------');
       log.success('Found DENON device in local network:');
       log.success('Friendly name:', service.details?.device?.friendlyName);
       log.success('Model name:   ', service.details?.device?.modelName);
       log.success('Serial number:', serial);
-      log.success('IP address:   ', service.location?.hostname);
+      log.success('IP address:   ', service.location.hostname);
+      log.success('Supported modes:', supportedModes.map(mode => DenonTelnetMode[mode]).join(', '));
       log.success('---------------------------------------------------------');
     }
   }
