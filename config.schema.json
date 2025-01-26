@@ -23,7 +23,7 @@
             "name": {
               "title": "Name",
               "type": "string",
-              "default": "Denon Speaker",
+              "placeholder": "Give your speaker a name",
               "required": true
             },
             "serialNumber": {
@@ -35,7 +35,23 @@
               "title": "IP Address",
               "description": "If your device has a static IP address, you can enter it here.",
               "type": "string",
+              "format": "ipv4",
               "required": false
+            },
+            "volumeLimitEnabled": {
+              "title": "Volume Limit",
+              "description": "When you set a volume limit, 100% volume in HomeKit will correspond to this percentage on your device.",
+              "type": "boolean",
+              "required": false,
+              "default": false
+            },
+            "volumeLimit": {
+              "description": "only has an effect if volume limit is enabled above",
+              "type": "integer",
+              "required": false,
+              "minimum": 0,
+              "maximum": 100,
+              "default": 100
             }
           }
         }
