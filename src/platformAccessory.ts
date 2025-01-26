@@ -48,7 +48,7 @@ export class DenonTelnetAccessory {
     this.informationService.setCharacteristic(this.platform.Characteristic.FirmwareRevision, "unknown");
     this.fetchMetadataAios();
 
-    this.switchService = this.accessory.getService("Switch") || this.accessory.addService(this.platform.Service.Switch, this.name);
+    this.switchService = this.accessory.getService(`${this.name} Switch`) || this.accessory.addService(this.platform.Service.Switch, `${this.name} Switch`);
     this.switchService.getCharacteristic(this.platform.Characteristic.On)
       .onGet(this.getOn.bind(this))
       .onSet(this.setOn.bind(this));
