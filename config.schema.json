@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "DenonTelnet",
+  "pluginAlias": "DenonTelnetHeosCLI",
   "pluginType": "platform",
   "singular": true,
   "strictValidation": true,

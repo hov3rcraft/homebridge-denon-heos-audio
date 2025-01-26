@@ -1,4 +1,4 @@
-# homebridge-denon-telnet
+# Homebridge Denon Telnet & HeosCLI
 
 ## Resources
 - [Classic Telnet Protocol Specification](https://hometheaterreviewpro.com/how-to-control-your-denon-receiver-with-a-computer/#AVR_Control_Protocol)
