@@ -182,5 +182,3 @@ class ConnectionTimeoutException extends Error {
         Object.setPrototypeOf(this, InvalidResponseException.prototype);
     }
 }
-
-// https://hometheaterreviewpro.com/how-to-control-your-denon-receiver-with-a-computer/#AVR_Control_Protocol
