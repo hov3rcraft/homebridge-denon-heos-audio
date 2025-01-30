@@ -4,7 +4,7 @@ import ssdp from '@achingbrain/ssdp';
 import { DenonTelnetAccessory } from './platformAccessory.js';
 import { ConsoleLogger } from './consoleLogger.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { checkTelnetSupport, DenonTelnetMode } from './denonTelnetClient.js';
+import { DenonTelnetClient, DenonTelnetMode } from './denonTelnetClient.js';
 
 export class DenonTelnetPlatform implements DynamicPlatformPlugin {
   public readonly log: Logger
@@ -144,7 +144,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
       }
 
       log.debug('Checking telnet support for:', service.location.hostname);
-      const supportedModes = await checkTelnetSupport(service.location.hostname);
+      const supportedModes = await DenonTelnetClient.checkTelnetSupport(service.location.hostname);
       if (supportedModes.length === 0) {
         continue;
       }

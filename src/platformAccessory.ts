@@ -3,8 +3,8 @@ import type { CharacteristicValue, Logger, PlatformAccessory, Service } from 'ho
 import type { DenonTelnetPlatform } from './platform.js';
 
 import { DOMParser } from '@xmldom/xmldom'
-import { DenonTelnetClient, DenonTelnetMode } from './denonTelnetClient.js';
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
+import { DenonTelnetClientAvrControl } from './denonTelnetClientAvrControl.js';
 
 /**
  * Platform Accessory
@@ -17,7 +17,7 @@ export class DenonTelnetAccessory {
 
   private readonly platform: DenonTelnetPlatform;
   private readonly accessory: PlatformAccessory;
-  private readonly telnetClient: DenonTelnetClient;
+  private readonly telnetClient: DenonTelnetClientAvrControl;
   private readonly informationService: Service;
   private readonly switchService: Service;
   private readonly log: Logger;
@@ -53,9 +53,8 @@ export class DenonTelnetAccessory {
       .onGet(this.getOn.bind(this))
       .onSet(this.setOn.bind(this));
 
-    this.telnetClient = new DenonTelnetClient(
+    this.telnetClient = new DenonTelnetClientAvrControl(
       this.ip,
-      DenonTelnetMode.AVRCONTROL,
       DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
       (power: boolean) => {
         this.switchService.updateCharacteristic(this.platform.Characteristic.On, power
