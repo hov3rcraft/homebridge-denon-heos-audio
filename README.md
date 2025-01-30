@@ -23,5 +23,5 @@ I use the following devices for testing:
 - device auto-discovery when IP is not static
 
 ## Resources
-- [Classic Telnet Protocol Specification](https://hometheaterreviewpro.com/how-to-control-your-denon-receiver-with-a-computer/#AVR_Control_Protocol)
+- [Classic AVR Control Protocol Specification](https://assets.denon.com/documentmaster/uk/avr1713_avr1613_protocol_v860.pdf)
 - [HEOS CLI Protocol Specification](https://rn.dmglobal.com/usmodel/HEOS_CLI_ProtocolSpecification-Version-1.17.pdf)
