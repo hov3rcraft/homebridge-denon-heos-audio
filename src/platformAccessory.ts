@@ -55,7 +55,7 @@ export class DenonTelnetAccessory {
 
     this.telnetClient = new DenonTelnetClient(
       this.ip,
-      DenonTelnetMode.CLASSIC,
+      DenonTelnetMode.AVRCONTROL,
       DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
       (power: boolean) => {
         this.switchService.updateCharacteristic(this.platform.Characteristic.On, power

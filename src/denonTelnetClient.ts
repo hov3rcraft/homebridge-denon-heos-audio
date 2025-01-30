@@ -3,7 +3,7 @@ import { Mutex } from 'async-mutex';
 import * as net from 'net';
 
 export enum DenonTelnetMode {
-    CLASSIC = 23,
+    AVRCONTROL = 23,
     HEOSCLI = 1255
 }
 
