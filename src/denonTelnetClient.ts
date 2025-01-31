@@ -5,7 +5,8 @@ import * as net from 'net';
 export enum DenonTelnetMode {
     AVRCONTROL = 23,
     HEOSCLI = 1255,
-    HYBRID = -1
+    HYBRID = -1,
+    AUTO = -2
 }
 
 export enum Playing {

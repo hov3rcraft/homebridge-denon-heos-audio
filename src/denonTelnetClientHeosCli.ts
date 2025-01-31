@@ -1,4 +1,3 @@
-import { Telnet } from "telnet-client";
 import { DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing } from "./denonTelnetClient.js";
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {

@@ -38,6 +38,25 @@
               "format": "ipv4",
               "required": false
             },
+            "controlMode": {
+              "title": "Control Mode",
+              "type": "string",
+              "oneOf": [
+                {
+                  "const": "AVRCONTROL",
+                  "title": "AVR Control"
+                },
+                {
+                  "const": "HEOSCLI",
+                  "title": "Heos CLI"
+                },
+                {
+                  "const": "HYBRID",
+                  "title": "Hybrid"
+                }
+              ],
+              "required": true
+            },
             "volumeLimitEnabled": {
               "title": "Volume Limit",
               "description": "When you set a volume limit, 100% volume in HomeKit will correspond to this percentage on your device.",

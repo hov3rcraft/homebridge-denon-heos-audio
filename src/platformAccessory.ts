@@ -5,8 +5,9 @@ import type { DenonTelnetPlatform } from './platform.js';
 import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
 import { DenonTelnetClientAvrControl } from './denonTelnetClientAvrControl.js';
-import { IDenonTelnetClient } from './denonTelnetClient.js';
+import { DenonTelnetMode, IDenonTelnetClient } from './denonTelnetClient.js';
 import { DenonTelnetClientHeosCli } from './denonTelnetClientHeosCli.js';
+import { DenonTelnetClientHybrid } from './denonTelnetClientHybrid.js';
 
 /**
  * Platform Accessory
@@ -27,6 +28,7 @@ export class DenonTelnetAccessory {
   private readonly name: string;
   private readonly ip: string;
   private readonly serialNumber: string;
+  private readonly telnetMode: DenonTelnetMode;
 
   constructor(platform: DenonTelnetPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
     log.debug('Initializing DenonTelnetAccessory...');
@@ -38,6 +40,7 @@ export class DenonTelnetAccessory {
     this.name = accessory.displayName;
     this.ip = config.ip;
     this.serialNumber = config.serialNumber;
+    this.telnetMode = DenonTelnetMode[config.controlMode as keyof typeof DenonTelnetMode];
 
     // set accessory information
     this.informationService = this.accessory.getService(this.platform.Service.AccessoryInformation)!;
@@ -50,29 +53,48 @@ export class DenonTelnetAccessory {
     this.informationService.setCharacteristic(this.platform.Characteristic.FirmwareRevision, "unknown");
     this.fetchMetadataAios();
 
+    // add on/off switch
     this.switchService = this.accessory.getService(`${this.name} Switch`) || this.accessory.addService(this.platform.Service.Switch, `${this.name} Switch`);
     this.switchService.getCharacteristic(this.platform.Characteristic.On)
       .onGet(this.getOn.bind(this))
       .onSet(this.setOn.bind(this));
 
-    this.telnetClient = new DenonTelnetClientAvrControl(
-      this.serialNumber,
-      this.ip,
-      DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
-      (power: boolean) => {
-        this.switchService.updateCharacteristic(this.platform.Characteristic.On, power
 
+    // choose appropriate telnet client
+    switch (this.telnetMode) {
+      case DenonTelnetMode.AVRCONTROL:
+        this.telnetClient = new DenonTelnetClientAvrControl(
+          this.serialNumber,
+          this.ip,
+          DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          (power: boolean) => {
+            this.switchService.updateCharacteristic(this.platform.Characteristic.On, power);
+          },
+          this.log.debug.bind(this.log)
         );
-      },
-      this.log.debug.bind(this.log)
-    );
-
-    this.telnetClient = new DenonTelnetClientHeosCli(
-      this.serialNumber,
-      this.ip,
-      DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
-      this.log.debug.bind(this.log)
-    )
+        break;
+      case DenonTelnetMode.HEOSCLI:
+        this.telnetClient = new DenonTelnetClientHeosCli(
+          this.serialNumber,
+          this.ip,
+          DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          this.log.debug.bind(this.log)
+        );
+        break;
+      case DenonTelnetMode.HYBRID:
+        this.telnetClient = new DenonTelnetClientHybrid(
+          this.serialNumber,
+          this.ip,
+          DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          (power: boolean) => {
+            this.switchService.updateCharacteristic(this.platform.Characteristic.On, power);
+          },
+          this.log.debug.bind(this.log)
+        )
+        break;
+      case DenonTelnetMode.AUTO:
+        throw new Error("AUTO control mode not implemented yet");
+    }
 
     this.log.info('Finished initializing accessory:', this.name);
   }
