@@ -10,14 +10,27 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
             GET: {
                 COMMAND: 'PW?',
                 PARAMS: '',
-                MESSAGE: 'PW[VALUE]'
+                MESSAGE: /^PW(\w+)$/
             },
             SET: {
                 COMMAND: 'PW',
                 PARAMS: '[VALUE]',
-                MESSAGE: 'PW[VALUE]'
+                MESSAGE: /^PW(\w+)$/
+            },
+            VALUES: {
+                "ON": true,
+                "STANDBY": false
             }
         }
+    }
+
+    protected static reversePowerValues = function (power: boolean) {
+        for (const [key, value] of Object.entries(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES)) {
+            if (value === power) {
+                return key;
+            }
+        }
+        return undefined;
     }
 
     constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
@@ -32,47 +45,50 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
         }, powerUpdateCallback, debugLogCallback);
     }
 
-    protected async postConnect(connection: Telnet): Promise<void> {
-        return;
-    }
-
-    protected genericResponseHandler(response: string) {
-        switch (response) {
-            case "PWON": //TODO
-                if (this.powerUpdateCallback) {
-                    this.powerUpdateCallback(true);
-                }
-                break;
-            case "PWSTANDBY": // TODO
-                if (this.powerUpdateCallback) {
-                    this.powerUpdateCallback(false);
-                }
-                break;
-            default:
-                break;
+    private async sendCommandAndParseResponse(command: any, value?: any): Promise<string> {
+        let commandStr = command.COMMAND + command.PARAMS;
+        if (value) {
+            commandStr = commandStr.replace("[VALUE]", value);
         }
-    }
 
-    private async powerCommand(command: string): Promise<boolean> {
-        const responses = await this.send(command);
+        const responses = await this.send(commandStr);
 
         for (let i = responses.length - 1; i >= 0; i--) {
             let r = responses[i];
-            if (r === "PWON") { // TODO
-                return true;
-            } else if (r === "PWSTANDBY") { // TODO
-                return false;
+
+            const captures = r.match(command.MESSAGE);
+            if (captures && captures.length === 2) {
+                return captures[1];
             }
         }
-        throw new InvalidResponseException('Invalid response for power status', [DenonTelnetClientAvrControl.PROTOCOL.POWER.SET.MESSAGE], responses[responses.length - 1]);
+        throw new InvalidResponseException("No valid response!", command.MESSAGE.source, "");
     }
 
-    public getPower(): Promise<boolean> {
-        return this.powerCommand("PW?"); // TODO
+    protected genericResponseHandler(response: string) {
+        // Power
+        let match = response.match(DenonTelnetClientAvrControl.PROTOCOL.POWER.GET.MESSAGE);
+        if (match) {
+            if (match[1] in DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES && this.powerUpdateCallback) {
+                this.powerUpdateCallback(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES[match[1] as keyof typeof DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES]);
+            } else {
+                throw new InvalidResponseException("Unexpected power state", Object.keys(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES), match[1]);
+            }
+        }
     }
 
-    public setPower(power: boolean): Promise<boolean> {
-        const command = power ? "PWON" : "PWSTANDBY"; // TODO
-        return this.powerCommand(command);
+    public async getPower(): Promise<boolean> {
+        let response = await this.sendCommandAndParseResponse(DenonTelnetClientAvrControl.PROTOCOL.POWER.GET);
+        if (response in DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES) {
+            return DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES[response as keyof typeof DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES];
+        }
+        throw new InvalidResponseException("Unexpected power state", Object.keys(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES), response);
+    }
+
+    public async setPower(power: boolean): Promise<boolean> {
+        let response = await this.sendCommandAndParseResponse(DenonTelnetClientAvrControl.PROTOCOL.POWER.SET, DenonTelnetClientAvrControl.reversePowerValues(power));
+        if (response in DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES) {
+            return DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES[response as keyof typeof DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES];
+        }
+        throw new InvalidResponseException("Unexpected power state", Object.keys(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES), response);
     }
 }

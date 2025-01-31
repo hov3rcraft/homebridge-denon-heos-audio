@@ -203,6 +203,17 @@ export class ConnectionTimeoutException extends Error {
         this.name = 'ConnectionTimeoutException'; // Set the error name
 
         // Ensure the prototype chain is correctly set for instanceof checks
-        Object.setPrototypeOf(this, InvalidResponseException.prototype);
+        Object.setPrototypeOf(this, ConnectionTimeoutException.prototype);
+    }
+}
+
+export class CommandFailedException extends Error {
+
+    constructor(command: string) {
+        super(`Execution of command "${command}" has failed on the server side.`); // Pass the message to the parent Error class
+        this.name = 'CommandFailedException'; // Set the error name
+
+        // Ensure the prototype chain is correctly set for instanceof checks
+        Object.setPrototypeOf(this, CommandFailedException.prototype);
     }
 }

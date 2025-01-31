@@ -1,4 +1,4 @@
-import { DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing } from "./denonTelnetClient.js";
+import { CommandFailedException, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing } from "./denonTelnetClient.js";
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
@@ -58,7 +58,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
                 continue;
             }
             if (r_obj.heos.result !== "success") {
-                throw new InvalidResponseException("result != success");
+                throw new CommandFailedException(commandStr);
             }
             for (const player of r_obj.payload) {
                 if (player.serial === this.serialNumber) {
@@ -72,7 +72,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
         }
     }
 
-    private async sendHandler(command: any, value?: any): Promise<string> {
+    private async sendCommandAndParseResponse(command: any, value?: any): Promise<string> {
         if (!this.player_id) {
             await this.findPlayerId();
         }
@@ -95,14 +95,16 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
                 continue;
             }
             if (r_obj.heos.result !== "success") {
-                throw new InvalidResponseException("result != success");
+                throw new CommandFailedException(commandStr);
             }
 
             const captures = r_obj.heos.message.match(new RegExp(`^${expectedMessage}$`.replace("[VALUE]", "(\\w+)")));
-            if (captures.length !== 2) {
+            if (captures && captures.length === 2) {
+                return captures[1];
+            }
+            else {
                 throw new InvalidResponseException("Result message unexpected", expectedMessage, r_obj.heos.message);
             }
-            return captures[1];
         }
         throw new InvalidResponseException("No valid response!", expectedMessage, "");
     }
@@ -112,7 +114,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     public async getPlaying(): Promise<Playing> {
-        let response = await this.sendHandler(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET);
+        let response = await this.sendCommandAndParseResponse(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET);
         if (response in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES) {
             return DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
         }
@@ -120,7 +122,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     public async setPlaying(playing: Playing): Promise<Playing> {
-        let response = await this.sendHandler(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.SET, DenonTelnetClientHeosCli.REVERSE_PLAY_STATE_VALUES[playing]);
+        let response = await this.sendCommandAndParseResponse(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.SET, DenonTelnetClientHeosCli.REVERSE_PLAY_STATE_VALUES[playing]);
         if (response in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES) {
             return DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
         }
