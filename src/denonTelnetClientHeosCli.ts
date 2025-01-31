@@ -1,5 +1,4 @@
 import { CommandFailedException, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonTelnetClient.js";
-import { Telnet } from 'telnet-client';
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
@@ -199,7 +198,11 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     public async setPower(power: boolean): Promise<boolean> {
-        return IS_PLAYING[await this.setPlaying(power ? Playing.PLAY : Playing.STOP)]
+        const newPlaying = await this.setPlaying(power ? Playing.PLAY : Playing.STOP);
+        if (this.powerUpdateCallback) {
+            this.powerUpdateCallback(IS_PLAYING[newPlaying]);
+        }
+        return IS_PLAYING[newPlaying];
     }
 
     public async getPlay(): Promise<boolean> {

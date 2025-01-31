@@ -165,24 +165,12 @@ export class DenonTelnetAccessory {
    * Handle "SET" requests from HomeKit
    * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
    */
-  async setOn(state: CharacteristicValue) {
+  setOn(state: CharacteristicValue) {
     this.log.debug(`setPower for ${this.name} set to ${state}`);
-
-    try {
-      return await Promise.race([
-        this.telnetClient.setPower(state as boolean),
-        new Promise<void>((resolve, reject) => {
-          setTimeout(() => reject(new PromiseTimeoutException(DenonTelnetAccessory.CALLBACK_TIMEOUT)), DenonTelnetAccessory.CALLBACK_TIMEOUT);
-        })
-      ]);
-    } catch (error) {
-      if ((error instanceof PromiseTimeoutException)) {
-        this.log.warn(`${this.name} seems to be unresponsive.`);
-      } else {
-        this.log.error(`An error occured while setting power status for ${this.name}.`, error);
-      }
+    this.telnetClient.setPower(state as boolean).catch((error) => {
+      this.log.error(`An error occured while setting power status for ${this.name}.`, error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-    }
+    });
   }
 
   setIdentify(value: any) {
