@@ -4,10 +4,18 @@ import * as net from 'net';
 
 export enum DenonTelnetMode {
     AVRCONTROL = 23,
-    HEOSCLI = 1255
+    HEOSCLI = 1255,
+    HYBRID = -1
 }
 
-export abstract class DenonTelnetClient {
+export interface IDenonTelnetClient {
+    readonly mode: DenonTelnetMode;
+    isConnected(): boolean;
+    getPower(): Promise<boolean>;
+    setPower(power: boolean): Promise<boolean>;
+}
+
+export abstract class DenonTelnetClient implements IDenonTelnetClient {
     protected static readonly COMMANDS = {
         POWER: {
             ON: 'PWON',
@@ -25,16 +33,17 @@ export abstract class DenonTelnetClient {
 
     private readonly params;
     private connection;
-    protected isConnected;
+    protected connected;
+    public abstract readonly mode: DenonTelnetMode;
     private mutex;
 
     protected powerUpdateCallback;
     protected debugLogCallback;
 
-    constructor(host: string, mode: DenonTelnetMode, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+    constructor(host: string, port: number, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         this.params = {
             host: host,
-            port: mode,
+            port: port,
             timeout: timeout,
             negotiationMandatory: false,
             irs: '\r',
@@ -43,7 +52,7 @@ export abstract class DenonTelnetClient {
         };
 
         this.connection = new Telnet();
-        this.isConnected = false;
+        this.connected = false;
         this.mutex = new Mutex();
 
         this.powerUpdateCallback = powerUpdateCallback;
@@ -53,17 +62,17 @@ export abstract class DenonTelnetClient {
     protected async connect() {
         this.debugLog('Establishing new connection...');
         this.connection = new Telnet();
-        this.isConnected = false;
+        this.connected = false;
 
         // Listen for connection closure events
         this.connection.on('close', () => {
-            this.isConnected = false;
+            this.connected = false;
         });
         this.connection.on('end', () => {
-            this.isConnected = false;
+            this.connected = false;
         });
         this.connection.on('error', (error) => {
-            this.isConnected = false;
+            this.connected = false;
         });
 
         // Listen for responses
@@ -78,7 +87,7 @@ export abstract class DenonTelnetClient {
         // Connect
         try {
             await this.connection.connect(this.params);
-            this.isConnected = true;
+            this.connected = true;
             this.debugLog('New connection established.');
         } catch (error) {
             // timeout
@@ -88,7 +97,7 @@ export abstract class DenonTelnetClient {
     protected async send(command: string): Promise<string[]> {
         const release = await this.mutex.acquire();
         try {
-            if (!this.isConnected) {
+            if (!this.connected) {
                 await this.connect();
             }
             this.debugLog('Sending command:', command);
@@ -107,6 +116,14 @@ export abstract class DenonTelnetClient {
             this.debugLogCallback(message, ...parameters);
         }
     }
+
+    public isConnected(): boolean {
+        return this.connected;
+    }
+
+    public abstract getPower(): Promise<boolean>;
+
+    public abstract setPower(power: boolean): Promise<boolean>;
 
     private static checkTelnetAtPort(host: string, port: number): Promise<boolean> {
         return new Promise((resolve, reject) => {
@@ -131,7 +148,7 @@ export abstract class DenonTelnetClient {
         });
     }
 
-    static async checkTelnetSupport(host: string): Promise<DenonTelnetMode[]> {
+    public static async checkTelnetSupport(host: string): Promise<DenonTelnetMode[]> {
         let supportedModes = [];
         for (const mode of Object.values(DenonTelnetMode).filter(value => typeof value === 'number')) {
             let supported = await DenonTelnetClient.checkTelnetAtPort(host, mode);

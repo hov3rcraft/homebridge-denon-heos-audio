@@ -5,6 +5,7 @@ import type { DenonTelnetPlatform } from './platform.js';
 import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
 import { DenonTelnetClientAvrControl } from './denonTelnetClientAvrControl.js';
+import { IDenonTelnetClient } from './denonTelnetClient.js';
 
 /**
  * Platform Accessory
@@ -17,7 +18,7 @@ export class DenonTelnetAccessory {
 
   private readonly platform: DenonTelnetPlatform;
   private readonly accessory: PlatformAccessory;
-  private readonly telnetClient: DenonTelnetClientAvrControl;
+  private readonly telnetClient: IDenonTelnetClient;
   private readonly informationService: Service;
   private readonly switchService: Service;
   private readonly log: Logger;

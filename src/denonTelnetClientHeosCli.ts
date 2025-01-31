@@ -1,11 +1,22 @@
 import { DenonTelnetClient, DenonTelnetMode, InvalidResponseException } from "./denonTelnetClient.js";
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {
-    constructor(host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
-        super(host, DenonTelnetMode.HEOSCLI, timeout, powerUpdateCallback, debugLogCallback);
+
+    public readonly mode = DenonTelnetMode.HEOSCLI;
+
+    constructor(host: string, timeout: number = 1500, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+        super(host, DenonTelnetMode.HEOSCLI, timeout, undefined, debugLogCallback);
     }
 
     protected genericResponseHandler(response: string) {
 
+    }
+
+    public getPower(): Promise<boolean> {
+        throw new Error("Method not implemented.");
+    }
+
+    public setPower(power: boolean): Promise<boolean> {
+        throw new Error("Method not implemented.");
     }
 }
