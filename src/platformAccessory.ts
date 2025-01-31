@@ -6,6 +6,7 @@ import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
 import { DenonTelnetClientAvrControl } from './denonTelnetClientAvrControl.js';
 import { IDenonTelnetClient } from './denonTelnetClient.js';
+import { DenonTelnetClientHeosCli } from './denonTelnetClientHeosCli.js';
 
 /**
  * Platform Accessory
@@ -13,7 +14,7 @@ import { IDenonTelnetClient } from './denonTelnetClient.js';
  * Each accessory may expose multiple services of different service types.
  */
 export class DenonTelnetAccessory {
-  private static readonly CALLBACK_TIMEOUT = 2500;
+  private static readonly CALLBACK_TIMEOUT = 3000;
   private static readonly TELNET_CONNECTION_TIMEOUT = 60000;
 
   private readonly platform: DenonTelnetPlatform;
@@ -55,6 +56,7 @@ export class DenonTelnetAccessory {
       .onSet(this.setOn.bind(this));
 
     this.telnetClient = new DenonTelnetClientAvrControl(
+      this.serialNumber,
       this.ip,
       DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
       (power: boolean) => {
@@ -64,6 +66,13 @@ export class DenonTelnetAccessory {
       },
       this.log.debug.bind(this.log)
     );
+
+    this.telnetClient = new DenonTelnetClientHeosCli(
+      this.serialNumber,
+      this.ip,
+      DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+      this.log.debug.bind(this.log)
+    )
 
     this.log.info('Finished initializing accessory:', this.name);
   }

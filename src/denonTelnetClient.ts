@@ -8,15 +8,40 @@ export enum DenonTelnetMode {
     HYBRID = -1
 }
 
+export enum Playing {
+    PLAY,
+    PAUSE,
+    STOP
+}
+
+export const IS_PLAYING: Record<Playing, boolean> = {
+    [Playing.PLAY]: true,
+    [Playing.PAUSE]: false,
+    [Playing.STOP]: false
+};
+
+interface IDenonTelnetClientConnectionParams {
+    readonly host: string;
+    readonly port: number;
+    readonly timeout: number;
+    readonly negotiationMandatory: boolean;
+    readonly irs: string;
+    readonly ors: string;
+    readonly echoLines: number;
+}
+
 export interface IDenonTelnetClient {
     readonly mode: DenonTelnetMode;
+    readonly serialNumber: string;
+
     isConnected(): boolean;
     getPower(): Promise<boolean>;
     setPower(power: boolean): Promise<boolean>;
 }
 
 export abstract class DenonTelnetClient implements IDenonTelnetClient {
-    private readonly params;
+    public readonly serialNumber: string;
+    public readonly params;
     protected readonly irsRegex;
     private connection;
     protected connected;
@@ -26,16 +51,9 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     protected powerUpdateCallback;
     protected debugLogCallback;
 
-    constructor(host: string, port: number, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
-        this.params = {
-            host: host,
-            port: port,
-            timeout: timeout,
-            negotiationMandatory: false,
-            irs: '\r',
-            ors: '\r',
-            echoLines: 0,
-        };
+    constructor(serialNumber: string, params: IDenonTelnetClientConnectionParams, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+        this.serialNumber = serialNumber;
+        this.params = params;
         this.irsRegex = new RegExp(`([^${this.params.irs}]+)`, "g");
 
         this.connection = new Telnet();
@@ -62,22 +80,22 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             this.connected = false;
         });
 
-        // Listen for responses
-        this.connection.on('data', data => {
-            let responses = data.toString().match(this.irsRegex) || [""];
-            for (const r of responses) {
-                this.debugLog('Received response:', JSON.stringify(r));
-                this.genericResponseHandler(r);
-            }
-        });
-
         // Connect
         try {
             await this.connection.connect(this.params);
             this.connected = true;
             this.debugLog('New connection established.');
+
+            // Listen for responses
+            this.connection.on('data', data => {
+                let responses = data.toString().match(this.irsRegex) || [""];
+                for (const r of responses) {
+                    this.debugLog('Received data event:', r);
+                    this.genericResponseHandler(r);
+                }
+            });
         } catch (error) {
-            // timeout
+            // TODO: connection failed
         }
     }
 
@@ -89,7 +107,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             }
             this.debugLog('Sending command:', command);
             let responses = await this.connection.send(command);
-            let responsesSplit = responses.match(this.irsRegex) || [""];;
+            let responsesSplit = responses.match(this.irsRegex) || [""];
             return responsesSplit;
         } finally {
             release();
@@ -121,12 +139,10 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             });
 
             socket.on('error', (err) => {
-                console.error(`Failed to connect to ${host}:${port}`, err.message);
                 resolve(false); // Telnet is not supported or some error occurred
             });
 
             socket.on('timeout', () => {
-                console.error(`Connection to ${host}:${port} timed out.`);
                 socket.end(); // Close the connection
                 resolve(false); // Telnet is not supported
             });
@@ -138,9 +154,11 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     public static async checkTelnetSupport(host: string): Promise<DenonTelnetMode[]> {
         let supportedModes = [];
         for (const mode of Object.values(DenonTelnetMode).filter(value => typeof value === 'number')) {
-            let supported = await DenonTelnetClient.checkTelnetAtPort(host, mode);
-            if (supported) {
-                supportedModes.push(mode);
+            if (mode >= 0) {
+                let supported = await DenonTelnetClient.checkTelnetAtPort(host, mode);
+                if (supported) {
+                    supportedModes.push(mode);
+                }
             }
         }
         return supportedModes;

@@ -15,8 +15,8 @@ I am using the following devices for testing:
 - Denon AVR X1600H
 
 ## Roadmap
-- v0.2: Full control (via TV service) using the AVR control telnet protocol
-- v0.3: Play/pause switch using the HeosCLI protocol
+- v0.2: Play/pause switch using the HeosCLI protocol
+- v0.3: Full control (via TV service) using the AVR control telnet protocol
 - v0.4: Full control (via TV service) using the HeosCLI protocol and hybrid mode
 
 ### Other planned improvements

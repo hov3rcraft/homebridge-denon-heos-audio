@@ -5,13 +5,15 @@ import { DenonTelnetClientHeosCli } from "./denonTelnetClientHeosCli.js";
 export class DenonTelnetClientHybrid implements IDenonTelnetClient {
 
     public readonly mode = DenonTelnetMode.HYBRID;
+    public readonly serialNumber: string;
 
     private readonly telnetClientAvrControl;
     private readonly telnetClientHeosCli;
 
-    constructor(host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
-        this.telnetClientAvrControl = new DenonTelnetClientAvrControl(host, timeout, powerUpdateCallback, debugLogCallback);
-        this.telnetClientHeosCli = new DenonTelnetClientHeosCli(host, timeout, debugLogCallback);
+    constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+        this.telnetClientAvrControl = new DenonTelnetClientAvrControl(serialNumber, host, timeout, powerUpdateCallback, debugLogCallback);
+        this.telnetClientHeosCli = new DenonTelnetClientHeosCli(serialNumber, host, timeout, debugLogCallback);
+        this.serialNumber = serialNumber;
     }
 
     public isConnected(): boolean {
