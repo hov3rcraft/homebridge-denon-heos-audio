@@ -1,4 +1,4 @@
-import { IDenonTelnetClient, DenonTelnetMode } from "./denonTelnetClient.js";
+import { IDenonTelnetClient, DenonTelnetMode, RaceStatus } from "./denonTelnetClient.js";
 import { DenonTelnetClientAvrControl } from "./denonTelnetClientAvrControl.js";
 import { DenonTelnetClientHeosCli } from "./denonTelnetClientHeosCli.js";
 
@@ -20,7 +20,7 @@ export class DenonTelnetClientHybrid implements IDenonTelnetClient {
         return this.telnetClientAvrControl.isConnected() || this.telnetClientHeosCli.isConnected();
     }
 
-    public getPower(): Promise<boolean> {
+    public getPower(raceStatus?: RaceStatus): Promise<boolean> {
         return this.telnetClientAvrControl.getPower();
     }
 

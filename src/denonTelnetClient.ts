@@ -36,7 +36,7 @@ export interface IDenonTelnetClient {
     readonly serialNumber: string;
 
     isConnected(): boolean;
-    getPower(): Promise<boolean>;
+    getPower(raceStatus?: RaceStatus): Promise<boolean>;
     setPower(power: boolean): Promise<boolean>;
 }
 
@@ -145,7 +145,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
         return this.connected;
     }
 
-    public abstract getPower(): Promise<boolean>;
+    public abstract getPower(raceStatus?: RaceStatus): Promise<boolean>;
 
     public abstract setPower(power: boolean): Promise<boolean>;
 
@@ -233,5 +233,20 @@ export class CommandFailedException extends Error {
 
         // Ensure the prototype chain is correctly set for instanceof checks
         Object.setPrototypeOf(this, CommandFailedException.prototype);
+    }
+}
+
+export class RaceStatus {
+    private static readonly ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+    private running = true;
+    public readonly raceId = RaceStatus.ID_CHARS[Math.floor(Math.random() * 36)] + RaceStatus.ID_CHARS[Math.floor(Math.random() * 36)];
+
+    public isRunning(): boolean {
+        return this.running;
+    }
+
+    public setRaceOver() {
+        this.running = false;
     }
 }

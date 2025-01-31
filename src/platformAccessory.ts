@@ -5,7 +5,7 @@ import type { DenonTelnetPlatform } from './platform.js';
 import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
 import { DenonTelnetClientAvrControl } from './denonTelnetClientAvrControl.js';
-import { DenonTelnetMode, IDenonTelnetClient } from './denonTelnetClient.js';
+import { DenonTelnetMode, IDenonTelnetClient, RaceStatus } from './denonTelnetClient.js';
 import { DenonTelnetClientHeosCli } from './denonTelnetClientHeosCli.js';
 import { DenonTelnetClientHybrid } from './denonTelnetClientHybrid.js';
 
@@ -15,7 +15,7 @@ import { DenonTelnetClientHybrid } from './denonTelnetClientHybrid.js';
  * Each accessory may expose multiple services of different service types.
  */
 export class DenonTelnetAccessory {
-  private static readonly CALLBACK_TIMEOUT = 3000;
+  private static readonly CALLBACK_TIMEOUT = 1500;
   private static readonly TELNET_CONNECTION_TIMEOUT = 60000;
 
   private readonly platform: DenonTelnetPlatform;
@@ -130,20 +130,24 @@ export class DenonTelnetAccessory {
    * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
    */
   async getOn(): Promise<CharacteristicValue> {
-    this.log.debug(`getPower for ${this.name}`);
+    let raceStatus = new RaceStatus();
 
     try {
+      this.log.debug(`getPower for ${this.name}. [race id: ${raceStatus.raceId}]`);
       return await Promise.race([
-        this.telnetClient.getPower(),
+        this.telnetClient.getPower(raceStatus),
         new Promise<boolean>((resolve, reject) => {
-          setTimeout(() => reject(new PromiseTimeoutException(DenonTelnetAccessory.CALLBACK_TIMEOUT)), DenonTelnetAccessory.CALLBACK_TIMEOUT);
+          setTimeout(() => {
+            raceStatus.setRaceOver();
+            reject(new PromiseTimeoutException(DenonTelnetAccessory.CALLBACK_TIMEOUT))
+          }, DenonTelnetAccessory.CALLBACK_TIMEOUT);
         })
       ]);
     } catch (error) {
       if ((error instanceof PromiseTimeoutException)) {
-        this.log.warn(`${this.name} seems to be unresponsive.`);
+        this.log.debug(`${this.name} lost its promise race for getOn(). [race id: ${raceStatus.raceId}]`);
       } else {
-        this.log.error(`An error occured while getting power status for ${this.name}.`, error);
+        this.log.error(`An error occured while getting power status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     }

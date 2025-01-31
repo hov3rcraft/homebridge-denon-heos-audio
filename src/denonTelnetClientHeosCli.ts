@@ -1,4 +1,4 @@
-import { CommandFailedException, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing } from "./denonTelnetClient.js";
+import { CommandFailedException, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonTelnetClient.js";
 import { Telnet } from 'telnet-client';
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {
@@ -189,8 +189,13 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
         throw new InvalidResponseException("Unexpected play state", Object.keys(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), response);
     }
 
-    public async getPower(): Promise<boolean> {
-        return IS_PLAYING[await this.getPlaying()];
+    public async getPower(raceStatus?: RaceStatus): Promise<boolean> {
+        const playing = await this.getPlaying();
+        if (raceStatus && !raceStatus.isRunning() && this.powerUpdateCallback) {
+            this.powerUpdateCallback(IS_PLAYING[playing]);
+            this.debugLog(`getPower was late to the party [race id: ${raceStatus.raceId}].`);
+        }
+        return IS_PLAYING[playing];
     }
 
     public async setPower(power: boolean): Promise<boolean> {
