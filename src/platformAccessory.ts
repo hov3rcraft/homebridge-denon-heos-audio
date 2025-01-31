@@ -67,9 +67,7 @@ export class DenonTelnetAccessory {
           this.serialNumber,
           this.ip,
           DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
-          (power: boolean) => {
-            this.switchService.updateCharacteristic(this.platform.Characteristic.On, power);
-          },
+          this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         );
         break;
@@ -78,6 +76,7 @@ export class DenonTelnetAccessory {
           this.serialNumber,
           this.ip,
           DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         );
         break;
@@ -86,9 +85,7 @@ export class DenonTelnetAccessory {
           this.serialNumber,
           this.ip,
           DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
-          (power: boolean) => {
-            this.switchService.updateCharacteristic(this.platform.Characteristic.On, power);
-          },
+          this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         )
         break;
@@ -186,5 +183,12 @@ export class DenonTelnetAccessory {
 
   setIdentify(value: any) {
     this.log.info('Triggered SET Identify:', value);
+  }
+
+  /**
+   * Handles characteristic updates from the API
+   */
+  private callbackOn(state: CharacteristicValue) {
+    this.switchService.updateCharacteristic(this.platform.Characteristic.On, state);
   }
 }

@@ -24,14 +24,7 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
         }
     }
 
-    protected static reversePowerValues = function (power: boolean) {
-        for (const [key, value] of Object.entries(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES)) {
-            if (value === power) {
-                return key;
-            }
-        }
-        return undefined;
-    }
+    protected static readonly REVERSE_POWER_VALUES = Object.fromEntries(Object.entries(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES).map(([key, value]) => [Number(value), key])) as Record<number, string>;
 
     constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         super(serialNumber, {
@@ -43,6 +36,12 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
             ors: '\r\n',
             echoLines: 0,
         }, powerUpdateCallback, debugLogCallback);
+
+        this.connect();
+    }
+
+    protected async subscribeToChangeEvents(): Promise<void> {
+        // not necessary
     }
 
     private async sendCommandAndParseResponse(command: any, value?: any): Promise<string> {
@@ -65,6 +64,8 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
     }
 
     protected genericResponseHandler(response: string) {
+        this.debugLog('Received data event:', response);
+
         // Power
         let match = response.match(DenonTelnetClientAvrControl.PROTOCOL.POWER.GET.MESSAGE);
         if (match) {
@@ -85,7 +86,7 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
     }
 
     public async setPower(power: boolean): Promise<boolean> {
-        let response = await this.sendCommandAndParseResponse(DenonTelnetClientAvrControl.PROTOCOL.POWER.SET, DenonTelnetClientAvrControl.reversePowerValues(power));
+        let response = await this.sendCommandAndParseResponse(DenonTelnetClientAvrControl.PROTOCOL.POWER.SET, DenonTelnetClientAvrControl.REVERSE_POWER_VALUES[Number(power)]);
         if (response in DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES) {
             return DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES[response as keyof typeof DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES];
         }

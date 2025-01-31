@@ -1,4 +1,5 @@
 import { CommandFailedException, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing } from "./denonTelnetClient.js";
+import { Telnet } from 'telnet-client';
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
@@ -6,6 +7,19 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
     protected static readonly PROTOCOL = {
         GLOBAL_PREFIX: "heos://",
+        GLOBAL_CHANGE_EVENT_REGEX: /^event\/(\w+)$/,
+        PID_REGEX: /pid=(\d+)/,
+        EVENT_SUB: {
+            SET: {
+                COMMAND: 'system/register_for_change_events',
+                PARAMS: '?enable=[VALUE]',
+                MESSAGE: 'enable=[VALUE]'
+            },
+            VALUES: {
+                "on": true,
+                "off": false
+            }
+        },
         PLAYERS: {
             GET: {
                 COMMAND: 'player/get_players',
@@ -16,6 +30,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             GET: {
                 COMMAND: 'player/get_play_state',
                 PARAMS: '?pid=[PID]',
+                EVENT: 'event/player_state_changed',
                 MESSAGE: 'pid=[PID]&state=[VALUE]'
             },
             SET: {
@@ -33,9 +48,11 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
     protected static readonly REVERSE_PLAY_STATE_VALUES = Object.fromEntries(Object.entries(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES).map(([key, value]) => [value, key])) as Record<Playing, string>;
 
+    protected static readonly REVERSE_EVENT_SUB_VALUES = Object.fromEntries(Object.entries(DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.VALUES).map(([key, value]) => [Number(value), key])) as Record<number, string>;
+
     private player_id: number | undefined;
 
-    constructor(serialNumber: string, host: string, timeout: number = 1500, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+    constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         super(serialNumber, {
             host: host,
             port: DenonTelnetMode.HEOSCLI,
@@ -44,9 +61,10 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             irs: '\r\n',
             ors: '\r\n',
             echoLines: 0,
-        }, undefined, debugLogCallback);
+        }, powerUpdateCallback, debugLogCallback);
 
         this.player_id = undefined;
+        this.findPlayerId();
     }
 
     private async findPlayerId() {
@@ -72,6 +90,24 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
         }
     }
 
+    protected async subscribeToChangeEvents(): Promise<void> {
+        const commandStr = (DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_PREFIX + DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND + DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.PARAMS)
+            .replace("[VALUE]", DenonTelnetClientHeosCli.REVERSE_EVENT_SUB_VALUES[Number(true)]);
+        const responses = await this.sendUnchecked(commandStr);
+        for (const r of responses) {
+            let r_obj = JSON.parse(r);
+            if (r_obj.heos.command !== DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND) {
+                continue;
+            }
+            if (r_obj.heos.result === "success") {
+                return;
+            } else {
+                throw new CommandFailedException(commandStr);
+            }
+        }
+        throw new InvalidResponseException("No valid response!", [DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.MESSAGE], "");
+    }
+
     private async sendCommandAndParseResponse(command: any, value?: any): Promise<string> {
         if (!this.player_id) {
             await this.findPlayerId();
@@ -90,7 +126,8 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             expectedMessage = expectedMessage.replace("[PID]", this.player_id.toString());
         }
         for (const r of responses) {
-            let r_obj = JSON.parse(r)
+            this.debugLog('Received response:', r);
+            const r_obj = JSON.parse(r)
             if (r_obj.heos.command !== command.COMMAND) {
                 continue;
             }
@@ -110,7 +147,30 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     protected genericResponseHandler(response: string) {
+        const r_obj = JSON.parse(response)
 
+        if (!r_obj.heos.command.match(DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_CHANGE_EVENT_REGEX)) {
+            return; // not an event
+        }
+
+        const pid_match = r_obj.heos.message.match(DenonTelnetClientHeosCli.PROTOCOL.PID_REGEX);
+        if (!pid_match || Number(pid_match[1]) !== this.player_id) {
+            return; // not this player
+        }
+
+        this.debugLog('Received change event:', response);
+
+        switch (r_obj.heos.command) {
+            case DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.EVENT:
+                const captures = r_obj.heos.message.match(new RegExp(`^${DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.MESSAGE}$`.replace("[PID]", this.player_id.toString()).replace("[VALUE]", "(\\w+)")));
+                if (captures && captures.length === 2 && captures[1] in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES && this.powerUpdateCallback) {
+                    this.powerUpdateCallback(IS_PLAYING[DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[captures[1] as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]);
+                }
+                else {
+                    throw new InvalidResponseException("Event message unexpected", [DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.MESSAGE], r_obj.heos.message);
+                }
+                break;
+        }
     }
 
     public async getPlaying(): Promise<Playing> {

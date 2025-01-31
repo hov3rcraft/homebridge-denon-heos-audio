@@ -65,7 +65,19 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
         this.debugLogCallback = debugLogCallback;
     }
 
-    protected async connect() {
+    protected async connect(): Promise<void> {
+        const release = await this.mutex.acquire();
+        try {
+            if (!this.connected) {
+                await this.connectUnchecked();
+            }
+            return;
+        } finally {
+            release();
+        }
+    }
+
+    protected async connectUnchecked(): Promise<void> {
         this.debugLog('Establishing new connection...');
         this.connection = new Telnet();
         this.connected = false;
@@ -86,12 +98,12 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             await this.connection.connect(this.params);
             this.connected = true;
             this.debugLog('New connection established.');
+            await this.subscribeToChangeEvents();
 
             // Listen for responses
             this.connection.on('data', data => {
                 let responses = data.toString().match(this.irsRegex) || [""];
                 for (const r of responses) {
-                    this.debugLog('Received data event:', r);
                     this.genericResponseHandler(r);
                 }
             });
@@ -100,19 +112,25 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
         }
     }
 
+    protected abstract subscribeToChangeEvents(): Promise<void>;
+
     protected async send(command: string): Promise<string[]> {
         const release = await this.mutex.acquire();
         try {
             if (!this.connected) {
-                await this.connect();
+                await this.connectUnchecked();
             }
-            this.debugLog('Sending command:', command);
-            let responses = await this.connection.send(command);
-            let responsesSplit = responses.match(this.irsRegex) || [""];
-            return responsesSplit;
+            return await this.sendUnchecked(command);
         } finally {
             release();
         }
+    }
+
+    protected async sendUnchecked(command: string) {
+        this.debugLog('Sending command:', command);
+        let responses = await this.connection.send(command);
+        let responsesSplit = responses.match(this.irsRegex) || [""];
+        return responsesSplit;
     }
 
     protected abstract genericResponseHandler(response: string): void;
