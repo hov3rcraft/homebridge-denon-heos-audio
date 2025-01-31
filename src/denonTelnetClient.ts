@@ -16,22 +16,8 @@ export interface IDenonTelnetClient {
 }
 
 export abstract class DenonTelnetClient implements IDenonTelnetClient {
-    protected static readonly COMMANDS = {
-        POWER: {
-            ON: 'PWON',
-            OFF: 'PWSTANDBY',
-            QUERY: 'PW?'
-        }
-    }
-
-    protected static readonly RESPONSES = {
-        POWER: {
-            ON: 'PWON',
-            OFF: 'PWSTANDBY'
-        }
-    }
-
     private readonly params;
+    protected readonly irsRegex;
     private connection;
     protected connected;
     public abstract readonly mode: DenonTelnetMode;
@@ -50,6 +36,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             ors: '\r',
             echoLines: 0,
         };
+        this.irsRegex = new RegExp(`([^${this.params.irs}]+)`, "g");
 
         this.connection = new Telnet();
         this.connected = false;
@@ -77,7 +64,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
 
         // Listen for responses
         this.connection.on('data', data => {
-            let responses = data.toString().match(/([^\r]+)/g) || [""];
+            let responses = data.toString().match(this.irsRegex) || [""];
             for (const r of responses) {
                 this.debugLog('Received response:', JSON.stringify(r));
                 this.genericResponseHandler(r);
@@ -102,7 +89,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             }
             this.debugLog('Sending command:', command);
             let responses = await this.connection.send(command);
-            let responsesSplit = responses.match(/([^\r]+)/g) || [""];;
+            let responsesSplit = responses.match(this.irsRegex) || [""];;
             return responsesSplit;
         } finally {
             release();
