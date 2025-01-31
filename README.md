@@ -3,21 +3,21 @@ This plugin uses telnet to control your Denon smart speakers, stereos, and AVRs.
 
 This plugin is especially useful for controlling smart speakers and stereos, which do not support HHTP commands on ports 80 and 8080 and therefore cannot use [homebridge-denon-tv](https://github.com/grzegorz914/homebridge-denon-tv).
 
-At this point, only a small subset of features is implemented (see [Roadmap](#roadmap)). I am planning to continue development over 2025
+## Pre-Release
+This is an early pre-release with only a small subset of features currently implemented (see [Roadmap](#roadmap)). I am planning to continue development over 2025
 
 ## Supported Devices
 This plugin should support any Denon smart speakers, stereos, and AVRs that support telnet and/or Heos. 
 
-I use the following devices for testing:
-- CEOL N10
-- Home 250
-- AVR X1600H
+I am using the following devices for testing:
+- Denon CEOL N10
+- Denon Home 250
+- Denon AVR X1600H
 
 ## Roadmap
 - v0.2: Full control (via TV service) using the AVR control telnet protocol
 - v0.3: Play/pause switch using the HeosCLI protocol
-- v0.4: Full control (via TV service) using the HeosCLI protocol
-- v0.5: Hybrid mode using the AVR control protocol for on/off and HeosCLI for the rest
+- v0.4: Full control (via TV service) using the HeosCLI protocol and hybrid mode
 
 ### Other planned improvements
 - device auto-discovery when IP is not static
