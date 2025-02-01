@@ -16,7 +16,8 @@ import { DenonTelnetClientHybrid } from './denonTelnetClientHybrid.js';
  */
 export class DenonTelnetAccessory {
   private static readonly CALLBACK_TIMEOUT = 1500;
-  private static readonly TELNET_CONNECTION_TIMEOUT = 60000;
+  private static readonly API_CONNECT_TIMEOUT = 5000;
+  private static readonly API_RESPONSE_TIMEOUT = 1000;
 
   private readonly platform: DenonTelnetPlatform;
   private readonly accessory: PlatformAccessory;
@@ -66,7 +67,8 @@ export class DenonTelnetAccessory {
         this.telnetClient = new DenonTelnetClientAvrControl(
           this.serialNumber,
           this.ip,
-          DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          DenonTelnetAccessory.API_CONNECT_TIMEOUT,
+          DenonTelnetAccessory.API_RESPONSE_TIMEOUT,
           this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         );
@@ -75,7 +77,8 @@ export class DenonTelnetAccessory {
         this.telnetClient = new DenonTelnetClientHeosCli(
           this.serialNumber,
           this.ip,
-          DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          DenonTelnetAccessory.API_CONNECT_TIMEOUT,
+          DenonTelnetAccessory.API_RESPONSE_TIMEOUT,
           this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         );
@@ -84,7 +87,8 @@ export class DenonTelnetAccessory {
         this.telnetClient = new DenonTelnetClientHybrid(
           this.serialNumber,
           this.ip,
-          DenonTelnetAccessory.TELNET_CONNECTION_TIMEOUT,
+          DenonTelnetAccessory.API_CONNECT_TIMEOUT,
+          DenonTelnetAccessory.API_RESPONSE_TIMEOUT,
           this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         )

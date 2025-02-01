@@ -51,15 +51,15 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
     private player_id: number | undefined;
 
-    constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+    constructor(serialNumber: string, host: string, connect_timeout: number, response_timeout: number, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         super(serialNumber, {
             host: host,
             port: DenonTelnetMode.HEOSCLI,
-            timeout: timeout,
-            negotiationMandatory: false,
-            irs: '\r\n',
-            ors: '\r\n',
-            echoLines: 0,
+            connect_timeout: connect_timeout,
+            response_timeout: response_timeout,
+            command_separator: '\r\n',
+            response_separator: '\r\n',
+            all_responses_to_generic: false
         }, powerUpdateCallback, debugLogCallback);
 
         this.player_id = undefined;
@@ -68,25 +68,21 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
     private async findPlayerId() {
         const commandStr = DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_PREFIX + DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND;
-        const responses = await this.send(commandStr);
-        for (const r of responses) {
-            let r_obj = JSON.parse(r);
-            if (r_obj.heos.command !== DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND) {
-                continue;
-            }
-            if (r_obj.heos.result !== "success") {
-                throw new CommandFailedException(commandStr);
-            }
-            for (const player of r_obj.payload) {
-                if (player.serial === this.serialNumber) {
-                    this.player_id = player.pid;
-                    break;
-                }
+        const response = await this.send(commandStr);
+        let r_obj = JSON.parse(response);
+        if (r_obj.heos.command !== DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND) {
+            throw new InvalidResponseException("No valid response!", [DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND], r_obj.heos.command);
+        }
+        if (r_obj.heos.result !== "success") {
+            throw new CommandFailedException(commandStr);
+        }
+        for (const player of r_obj.payload) {
+            if (player.serial === this.serialNumber) {
+                this.player_id = player.pid;
+                return;
             }
         }
-        if (!this.player_id) {
-            throw new InvalidResponseException("Player list does not include serial " + this.serialNumber);
-        }
+        throw new InvalidResponseException("Player list does not include serial " + this.serialNumber);
     }
 
     protected async subscribeToChangeEvents(): Promise<void> {
@@ -118,31 +114,28 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             commandStr = commandStr.replace("[VALUE]", value);
         }
 
-        const responses = await this.send(commandStr);
+        const response = await this.send(commandStr);
 
         let expectedMessage = command.MESSAGE;
         if (this.player_id) {
             expectedMessage = expectedMessage.replace("[PID]", this.player_id.toString());
         }
-        for (const r of responses) {
-            this.debugLog('Received response:', r);
-            const r_obj = JSON.parse(r)
-            if (r_obj.heos.command !== command.COMMAND) {
-                continue;
-            }
-            if (r_obj.heos.result !== "success") {
-                throw new CommandFailedException(commandStr);
-            }
-
-            const captures = r_obj.heos.message.match(new RegExp(`^${expectedMessage}$`.replace("[VALUE]", "(\\w+)")));
-            if (captures && captures.length === 2) {
-                return captures[1];
-            }
-            else {
-                throw new InvalidResponseException("Result message unexpected", expectedMessage, r_obj.heos.message);
-            }
+        this.debugLog('Received response:', response);
+        const r_obj = JSON.parse(response)
+        if (r_obj.heos.command !== command.COMMAND) {
+            throw new InvalidResponseException("No valid response!", expectedMessage, r_obj.heos.command);
         }
-        throw new InvalidResponseException("No valid response!", expectedMessage, "");
+        if (r_obj.heos.result !== "success") {
+            throw new CommandFailedException(commandStr);
+        }
+
+        const captures = r_obj.heos.message.match(new RegExp(`^${expectedMessage}$`.replace("[VALUE]", "(\\w+)")));
+        if (captures && captures.length === 2) {
+            return captures[1];
+        }
+        else {
+            throw new InvalidResponseException("Result message unexpected", expectedMessage, r_obj.heos.message);
+        }
     }
 
     protected genericResponseHandler(response: string) {

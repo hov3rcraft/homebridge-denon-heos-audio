@@ -1,4 +1,3 @@
-import { Telnet } from 'telnet-client';
 import { Mutex } from 'async-mutex';
 import * as net from 'net';
 
@@ -24,11 +23,11 @@ export const IS_PLAYING: Record<Playing, boolean> = {
 interface IDenonTelnetClientConnectionParams {
     readonly host: string;
     readonly port: number;
-    readonly timeout: number;
-    readonly negotiationMandatory: boolean;
-    readonly irs: string;
-    readonly ors: string;
-    readonly echoLines: number;
+    readonly connect_timeout: number;
+    readonly response_timeout: number;
+    readonly command_separator: string;
+    readonly response_separator: string;
+    readonly all_responses_to_generic: boolean;
 }
 
 export interface IDenonTelnetClient {
@@ -43,11 +42,12 @@ export interface IDenonTelnetClient {
 export abstract class DenonTelnetClient implements IDenonTelnetClient {
     public readonly serialNumber: string;
     public readonly params;
-    protected readonly irsRegex;
-    private connection;
-    protected connected;
+    private socket: net.Socket | undefined;
     public abstract readonly mode: DenonTelnetMode;
-    private mutex;
+    private sendMutex;
+    private dataEventMutex;
+    private pendingData: string;
+    private responseCallback: ResponseCallback | undefined;
 
     protected powerUpdateCallback;
     protected debugLogCallback;
@@ -55,20 +55,21 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     constructor(serialNumber: string, params: IDenonTelnetClientConnectionParams, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         this.serialNumber = serialNumber;
         this.params = params;
-        this.irsRegex = new RegExp(`([^${this.params.irs}]+)`, "g");
 
-        this.connection = new Telnet();
-        this.connected = false;
-        this.mutex = new Mutex();
+        this.socket = undefined;
+        this.sendMutex = new Mutex();
+        this.dataEventMutex = new Mutex();
+        this.pendingData = '';
+        this.responseCallback = undefined;
 
         this.powerUpdateCallback = powerUpdateCallback;
         this.debugLogCallback = debugLogCallback;
     }
 
     protected async connect(): Promise<void> {
-        const release = await this.mutex.acquire();
+        const release = await this.sendMutex.acquire();
         try {
-            if (!this.connected) {
+            if (!this.isConnected()) {
                 await this.connectUnchecked();
             }
             return;
@@ -78,59 +79,112 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     }
 
     protected async connectUnchecked(): Promise<void> {
-        this.debugLog('Establishing new connection...');
-        this.connection = new Telnet();
-        this.connected = false;
-
-        // Listen for connection closure events
-        this.connection.on('close', () => {
-            this.connected = false;
-        });
-        this.connection.on('end', () => {
-            this.connected = false;
-        });
-        this.connection.on('error', (error) => {
-            this.connected = false;
-        });
-
         // Connect
+        let newSocket: net.Socket | undefined = undefined;
         try {
-            await this.connection.connect(this.params);
-            this.connected = true;
-            this.debugLog('New connection established.');
-            await this.subscribeToChangeEvents();
+            this.debugLog('Establishing new connection...');
+            this.pendingData = '';
+            this.responseCallback = undefined;
+            newSocket = await new Promise<net.Socket>((resolve, reject) => {
+                newSocket = net.createConnection({
+                    host: this.params.host,
+                    port: this.params.port,
+                    timeout: 0 // no timeout
+                }, () => {
+                    this.debugLog('New connection established.');
+                    resolve(newSocket!);
+                });
 
-            // Listen for responses
-            this.connection.on('data', data => {
-                let responses = data.toString().match(this.irsRegex) || [""];
-                for (const r of responses) {
-                    this.genericResponseHandler(r);
-                }
+                // Listen for connection closure events
+                newSocket.on('timeout', () => {
+                    // TODO
+                })
+                newSocket.on('close', () => {
+                    this.socket = undefined;
+                });
+                newSocket.on('end', () => {
+                    this.socket = undefined;
+                });
+                newSocket.on('error', (error) => {
+                    this.socket = undefined;
+                    reject(error);
+                });
+
+                // Listen for responses
+                newSocket.on('data', (data) => {
+                    this.dataHandler(data);
+                });
+
+                setTimeout(() => {
+                    reject(new ConnectionTimeoutException(this.params));
+                }, this.params.connect_timeout);
             });
+            this.socket = newSocket;
+
+            await this.subscribeToChangeEvents();
         } catch (error) {
-            // TODO: connection failed
+            if (newSocket) {
+                this.debugLog('Destroying socket.')
+                newSocket!.destroy(); // Destroy the connection attempt
+            }
+            throw error;
         }
     }
 
     protected abstract subscribeToChangeEvents(): Promise<void>;
 
-    protected async send(command: string): Promise<string[]> {
-        const release = await this.mutex.acquire();
+    private async dataHandler(incomingData: any) {
+        const release = await this.dataEventMutex.acquire();
+        let chunks;
         try {
-            if (!this.connected) {
+            const currentData: string = (this.pendingData ? this.pendingData + incomingData.toString() : incomingData.toString());
+            chunks = currentData.split(this.params.response_separator);
+            this.pendingData = chunks[chunks.length - 1]
+        } finally {
+            release();
+        }
+        for (let i = 0; i <= chunks.length - 2; i++) {
+            if (this.responseCallback) {
+                if (!this.responseCallback.expectedResponse || chunks[i].match(this.responseCallback.expectedResponse)) {
+                    this.responseCallback.callback(chunks[i]);
+                    this.responseCallback = undefined;
+                    if (!this.params.all_responses_to_generic) {
+                        continue;
+                    }
+                }
+            }
+            this.genericResponseHandler(chunks[i]);
+        }
+    }
+
+    protected async send(command: string, expectedResponse?: RegExp): Promise<string> {
+        const release = await this.sendMutex.acquire();
+        try {
+            if (!this.isConnected()) {
                 await this.connectUnchecked();
             }
-            return await this.sendUnchecked(command);
+            return await this.sendUnchecked(command, expectedResponse);
         } finally {
             release();
         }
     }
 
-    protected async sendUnchecked(command: string) {
-        this.debugLog('Sending command:', command);
-        let responses = await this.connection.send(command);
-        let responsesSplit = responses.match(this.irsRegex) || [""];
-        return responsesSplit;
+    protected async sendUnchecked(command: string, expectedResponse?: RegExp): Promise<string> {
+        try {
+            return new Promise<string>((resolve, reject) => {
+                this.debugLog('Sending command:', command);
+                this.responseCallback = new ResponseCallback((response) => {
+                    resolve(response);
+                }, expectedResponse);
+                this.socket!.write(command + this.params.command_separator);
+                setTimeout(() => {
+                    reject(new ResponseTimeoutException(command, this.params.response_timeout));
+                }, this.params.response_timeout);
+            });
+        } catch (error) {
+            this.responseCallback = undefined;
+            throw error;
+        }
     }
 
     protected abstract genericResponseHandler(response: string): void;
@@ -142,7 +196,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     }
 
     public isConnected(): boolean {
-        return this.connected;
+        return this.socket !== undefined;
     }
 
     public abstract getPower(raceStatus?: RaceStatus): Promise<boolean>;
@@ -214,16 +268,38 @@ export class InvalidResponseException extends Error {
     }
 }
 
+class ResponseCallback {
+    public readonly callback: (response: string) => void;
+    public readonly expectedResponse: RegExp | undefined;
+
+    constructor(callback: (response: string) => void, expectedResponse?: RegExp) {
+        this.callback = callback;
+        this.expectedResponse = expectedResponse;
+    }
+}
+
 export class ConnectionTimeoutException extends Error {
 
-    constructor(params: any) {
-        super(`connection to ${params.host}:${params.port} timed out after ${params.timeout}ms.`); // Pass the message to the parent Error class
+    constructor(params: IDenonTelnetClientConnectionParams) {
+        super(`connection to ${params.host}:${params.port} timed out after ${params.connect_timeout}ms.`); // Pass the message to the parent Error class
         this.name = 'ConnectionTimeoutException'; // Set the error name
 
         // Ensure the prototype chain is correctly set for instanceof checks
         Object.setPrototypeOf(this, ConnectionTimeoutException.prototype);
     }
 }
+
+export class ResponseTimeoutException extends Error {
+
+    constructor(command: string, timeout: number) {
+        super(`response for command '${command}' timed out after ${timeout}ms.`); // Pass the message to the parent Error class
+        this.name = 'ResponseTimeoutException'; // Set the error name
+
+        // Ensure the prototype chain is correctly set for instanceof checks
+        Object.setPrototypeOf(this, ResponseTimeoutException.prototype);
+    }
+}
+
 
 export class CommandFailedException extends Error {
 

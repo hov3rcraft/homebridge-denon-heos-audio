@@ -1,4 +1,3 @@
-import { Telnet } from "telnet-client";
 import { DenonTelnetClient, DenonTelnetMode, InvalidResponseException } from "./denonTelnetClient.js";
 
 export class DenonTelnetClientAvrControl extends DenonTelnetClient {
@@ -26,22 +25,22 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
 
     protected static readonly REVERSE_POWER_VALUES = Object.fromEntries(Object.entries(DenonTelnetClientAvrControl.PROTOCOL.POWER.VALUES).map(([key, value]) => [Number(value), key])) as Record<number, string>;
 
-    constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+    constructor(serialNumber: string, host: string, connect_timeout: number, response_timeout: number, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         super(serialNumber, {
             host: host,
             port: DenonTelnetMode.AVRCONTROL,
-            timeout: timeout,
-            negotiationMandatory: false,
-            irs: '\r',
-            ors: '\r\n',
-            echoLines: 0,
+            connect_timeout: connect_timeout,
+            response_timeout: response_timeout,
+            command_separator: '\r\n',
+            response_separator: '\r',
+            all_responses_to_generic: false
         }, powerUpdateCallback, debugLogCallback);
 
         this.connect();
     }
 
     protected async subscribeToChangeEvents(): Promise<void> {
-        // not necessary
+        // not necessary - change events are automatically sent in AVR control
     }
 
     private async sendCommandAndParseResponse(command: any, value?: any): Promise<string> {
@@ -50,17 +49,13 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
             commandStr = commandStr.replace("[VALUE]", value);
         }
 
-        const responses = await this.send(commandStr);
+        const response = await this.send(commandStr);
 
-        for (let i = responses.length - 1; i >= 0; i--) {
-            let r = responses[i];
-
-            const captures = r.match(command.MESSAGE);
-            if (captures && captures.length === 2) {
-                return captures[1];
-            }
+        const captures = response.match(command.MESSAGE);
+        if (captures && captures.length === 2) {
+            return captures[1];
         }
-        throw new InvalidResponseException("No valid response!", command.MESSAGE.source, "");
+        throw new InvalidResponseException("No valid response!", [command.MESSAGE.source], "");
     }
 
     protected genericResponseHandler(response: string) {

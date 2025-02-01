@@ -10,9 +10,9 @@ export class DenonTelnetClientHybrid implements IDenonTelnetClient {
     private readonly telnetClientAvrControl;
     private readonly telnetClientHeosCli;
 
-    constructor(serialNumber: string, host: string, timeout: number = 1500, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
-        this.telnetClientAvrControl = new DenonTelnetClientAvrControl(serialNumber, host, timeout, powerUpdateCallback, debugLogCallback);
-        this.telnetClientHeosCli = new DenonTelnetClientHeosCli(serialNumber, host, timeout, powerUpdateCallback, debugLogCallback);
+    constructor(serialNumber: string, host: string, connect_timeout: number, response_timeout: number, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+        this.telnetClientAvrControl = new DenonTelnetClientAvrControl(serialNumber, host, connect_timeout, response_timeout, powerUpdateCallback, debugLogCallback);
+        this.telnetClientHeosCli = new DenonTelnetClientHeosCli(serialNumber, host, connect_timeout, response_timeout, powerUpdateCallback, debugLogCallback);
         this.serialNumber = serialNumber;
     }
 
