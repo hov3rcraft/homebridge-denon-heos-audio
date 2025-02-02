@@ -8,6 +8,11 @@ export enum DenonTelnetMode {
     AUTO = -2
 }
 
+export enum CommandMode {
+    GET,
+    SET
+}
+
 export enum Playing {
     PLAY,
     PAUSE,
@@ -25,6 +30,7 @@ interface IDenonTelnetClientConnectionParams {
     readonly port: number;
     readonly connect_timeout: number;
     readonly response_timeout: number;
+    readonly command_prefix: string | undefined;
     readonly command_separator: string;
     readonly response_separator: string;
     readonly all_responses_to_generic: boolean;
@@ -47,7 +53,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     private sendMutex;
     private dataEventMutex;
     private pendingData: string;
-    private responseCallback: ResponseCallback | undefined;
+    protected responseCallback: ResponseCallback | undefined;
 
     protected powerUpdateCallback;
     protected debugLogCallback;
@@ -133,6 +139,59 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
 
     protected abstract subscribeToChangeEvents(): Promise<void>;
 
+    protected async sendCommand(command: any, commandMode: CommandMode, { pid, value, passPayload = false }: { value?: string, pid?: number, passPayload?: boolean }): Promise<string> {
+        let specCommand = command[CommandMode[commandMode]];
+        let commandStr = specCommand.COMMAND + specCommand.PARAMS;
+        if (pid) {
+            commandStr = commandStr.replace("[PID]", pid);
+        }
+        if (value) {
+            commandStr = commandStr.replace("[VALUE]", value);
+        }
+
+        if (specCommand.EXP_RES) {
+            const response = await this.send(commandStr, specCommand.COMMAND, specCommand.EXP_RES, passPayload);
+            if (command.VALUES && !(response in command.VALUES)) {
+                throw new InvalidResponseException(`Unexpected response for command ${commandStr}`, command.VALUES, response);
+            } else {
+                return response;
+            }
+        } else {
+            return await this.send(commandStr, specCommand.COMMAND, undefined, passPayload);
+        }
+    }
+
+    protected async send(command: string, rawCommand?: string, expectedResponse?: RegExp, passPayload: boolean = false): Promise<string> {
+        const release = await this.sendMutex.acquire();
+        try {
+            if (!this.isConnected()) {
+                await this.connectUnchecked();
+            }
+            return await this.sendUnchecked(command, rawCommand, expectedResponse, passPayload);
+        } finally {
+            release();
+        }
+    }
+
+    protected async sendUnchecked(command: string, rawCommand?: string, expectedResponse?: RegExp, passPayload: boolean = false): Promise<string> {
+        try {
+            return new Promise<string>((resolve, reject) => {
+                const fullCommand = (this.params.command_prefix) ? this.params.command_prefix + command : command;
+                this.debugLog('Sending command:', fullCommand);
+                this.responseCallback = new ResponseCallback((response) => {
+                    resolve(response);
+                }, rawCommand ?? command, expectedResponse, passPayload);
+                this.socket!.write(fullCommand + this.params.command_separator);
+                setTimeout(() => {
+                    reject(new ResponseTimeoutException(fullCommand, this.params.response_timeout));
+                }, this.params.response_timeout);
+            });
+        } catch (error) {
+            this.responseCallback = undefined;
+            throw error;
+        }
+    }
+
     private async dataHandler(incomingData: any) {
         const release = await this.dataEventMutex.acquire();
         let chunks;
@@ -144,50 +203,11 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
             release();
         }
         for (let i = 0; i <= chunks.length - 2; i++) {
-            if (this.responseCallback) {
-                if (!this.responseCallback.expectedResponse || chunks[i].match(this.responseCallback.expectedResponse)) {
-                    this.responseCallback.callback(chunks[i]);
-                    this.responseCallback = undefined;
-                    if (!this.params.all_responses_to_generic) {
-                        continue;
-                    }
-                }
-            }
-            this.genericResponseHandler(chunks[i]);
+            this.responseRouter(chunks[i])
         }
     }
 
-    protected async send(command: string, expectedResponse?: RegExp): Promise<string> {
-        const release = await this.sendMutex.acquire();
-        try {
-            if (!this.isConnected()) {
-                await this.connectUnchecked();
-            }
-            return await this.sendUnchecked(command, expectedResponse);
-        } finally {
-            release();
-        }
-    }
-
-    protected async sendUnchecked(command: string, expectedResponse?: RegExp): Promise<string> {
-        try {
-            return new Promise<string>((resolve, reject) => {
-                this.debugLog('Sending command:', command);
-                this.responseCallback = new ResponseCallback((response) => {
-                    resolve(response);
-                }, expectedResponse);
-                this.socket!.write(command + this.params.command_separator);
-                setTimeout(() => {
-                    reject(new ResponseTimeoutException(command, this.params.response_timeout));
-                }, this.params.response_timeout);
-            });
-        } catch (error) {
-            this.responseCallback = undefined;
-            throw error;
-        }
-    }
-
-    protected abstract genericResponseHandler(response: string): void;
+    protected abstract responseRouter(response: string): void;
 
     protected debugLog(message: string, ...parameters: any[]) {
         if (this.debugLogCallback) {
@@ -238,6 +258,68 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     }
 }
 
+class ResponseCallback {
+    public readonly callback: (response: string) => void;
+    public readonly command: string;
+    public readonly expectedResponse: RegExp | undefined;
+    public readonly passPayload: boolean;
+
+    constructor(callback: (response: string) => void, command: string, expectedResponse?: RegExp, passPayload = false) {
+        this.callback = callback;
+        this.command = command;
+        this.expectedResponse = expectedResponse;
+        this.passPayload = passPayload;
+    }
+}
+
+export class RaceStatus {
+    private static readonly ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
+    private running = true;
+    public readonly raceId = RaceStatus.ID_CHARS[Math.floor(Math.random() * 36)] + RaceStatus.ID_CHARS[Math.floor(Math.random() * 36)];
+
+    public isRunning(): boolean {
+        return this.running;
+    }
+
+    public setRaceOver() {
+        this.running = false;
+    }
+}
+
+export class ConnectionTimeoutException extends Error {
+
+    constructor(params: IDenonTelnetClientConnectionParams) {
+        super(`connection to ${params.host}:${params.port} timed out after ${params.connect_timeout}ms.`); // Pass the message to the parent Error class
+        this.name = 'ConnectionTimeoutException'; // Set the error name
+
+        // Ensure the prototype chain is correctly set for instanceof checks
+        Object.setPrototypeOf(this, ConnectionTimeoutException.prototype);
+    }
+}
+
+export class ResponseTimeoutException extends Error {
+
+    constructor(command: string, timeout: number) {
+        super(`response for command '${command}' timed out after ${timeout}ms.`); // Pass the message to the parent Error class
+        this.name = 'ResponseTimeoutException'; // Set the error name
+
+        // Ensure the prototype chain is correctly set for instanceof checks
+        Object.setPrototypeOf(this, ResponseTimeoutException.prototype);
+    }
+}
+
+export class CommandFailedException extends Error {
+
+    constructor(command: string) {
+        super(`Execution of command "${command}" has failed on the server side.`); // Pass the message to the parent Error class
+        this.name = 'CommandFailedException'; // Set the error name
+
+        // Ensure the prototype chain is correctly set for instanceof checks
+        Object.setPrototypeOf(this, CommandFailedException.prototype);
+    }
+}
+
 export class InvalidResponseException extends Error {
     public expectedResponses?: string[];
     public actualResponse?: string;
@@ -265,64 +347,5 @@ export class InvalidResponseException extends Error {
             fullMessage += ` (Actual response: ${actualResponse})`;
         }
         return fullMessage;
-    }
-}
-
-class ResponseCallback {
-    public readonly callback: (response: string) => void;
-    public readonly expectedResponse: RegExp | undefined;
-
-    constructor(callback: (response: string) => void, expectedResponse?: RegExp) {
-        this.callback = callback;
-        this.expectedResponse = expectedResponse;
-    }
-}
-
-export class ConnectionTimeoutException extends Error {
-
-    constructor(params: IDenonTelnetClientConnectionParams) {
-        super(`connection to ${params.host}:${params.port} timed out after ${params.connect_timeout}ms.`); // Pass the message to the parent Error class
-        this.name = 'ConnectionTimeoutException'; // Set the error name
-
-        // Ensure the prototype chain is correctly set for instanceof checks
-        Object.setPrototypeOf(this, ConnectionTimeoutException.prototype);
-    }
-}
-
-export class ResponseTimeoutException extends Error {
-
-    constructor(command: string, timeout: number) {
-        super(`response for command '${command}' timed out after ${timeout}ms.`); // Pass the message to the parent Error class
-        this.name = 'ResponseTimeoutException'; // Set the error name
-
-        // Ensure the prototype chain is correctly set for instanceof checks
-        Object.setPrototypeOf(this, ResponseTimeoutException.prototype);
-    }
-}
-
-
-export class CommandFailedException extends Error {
-
-    constructor(command: string) {
-        super(`Execution of command "${command}" has failed on the server side.`); // Pass the message to the parent Error class
-        this.name = 'CommandFailedException'; // Set the error name
-
-        // Ensure the prototype chain is correctly set for instanceof checks
-        Object.setPrototypeOf(this, CommandFailedException.prototype);
-    }
-}
-
-export class RaceStatus {
-    private static readonly ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-
-    private running = true;
-    public readonly raceId = RaceStatus.ID_CHARS[Math.floor(Math.random() * 36)] + RaceStatus.ID_CHARS[Math.floor(Math.random() * 36)];
-
-    public isRunning(): boolean {
-        return this.running;
-    }
-
-    public setRaceOver() {
-        this.running = false;
     }
 }

@@ -1,18 +1,17 @@
-import { CommandFailedException, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonTelnetClient.js";
+import { CommandFailedException, CommandMode, DenonTelnetClient, DenonTelnetMode, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonTelnetClient.js";
 
 export class DenonTelnetClientHeosCli extends DenonTelnetClient {
 
     public readonly mode = DenonTelnetMode.HEOSCLI;
 
     protected static readonly PROTOCOL = {
-        GLOBAL_PREFIX: "heos://",
         GLOBAL_CHANGE_EVENT_REGEX: /^event\/(\w+)$/,
         PID_REGEX: /pid=(\d+)/,
         EVENT_SUB: {
             SET: {
                 COMMAND: 'system/register_for_change_events',
                 PARAMS: '?enable=[VALUE]',
-                MESSAGE: 'enable=[VALUE]'
+                EXP_RES: /enable=(\w+)/
             },
             VALUES: {
                 "on": true,
@@ -22,7 +21,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
         PLAYERS: {
             GET: {
                 COMMAND: 'player/get_players',
-                PARAMS: ''
+                PARAMS: '',
             }
         },
         PLAY_STATE: {
@@ -30,12 +29,12 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
                 COMMAND: 'player/get_play_state',
                 PARAMS: '?pid=[PID]',
                 EVENT: 'event/player_state_changed',
-                MESSAGE: 'pid=[PID]&state=[VALUE]'
+                EXP_RES: /state=(\w+)/
             },
             SET: {
                 COMMAND: 'player/set_play_state',
                 PARAMS: '?pid=[PID]&state=[VALUE]',
-                MESSAGE: 'pid=[PID]&state=[VALUE]'
+                EXP_RES: /state=(\w+)/
             },
             VALUES: {
                 "play": Playing.PLAY,
@@ -57,6 +56,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             port: DenonTelnetMode.HEOSCLI,
             connect_timeout: connect_timeout,
             response_timeout: response_timeout,
+            command_prefix: 'heos://',
             command_separator: '\r\n',
             response_separator: '\r\n',
             all_responses_to_generic: false
@@ -67,16 +67,13 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     private async findPlayerId() {
-        const commandStr = DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_PREFIX + DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND;
-        const response = await this.send(commandStr);
-        let r_obj = JSON.parse(response);
-        if (r_obj.heos.command !== DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND) {
-            throw new InvalidResponseException("No valid response!", [DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND], r_obj.heos.command);
+        const commandStr = DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND;
+        const payload_str = await this.sendCommand(DenonTelnetClientHeosCli.PROTOCOL.PLAYERS, CommandMode.GET, { passPayload: true });
+        const payload = JSON.parse(payload_str);
+        if (!Array.isArray(payload)) {
+            throw new InvalidResponseException("Payload is not an array!", undefined, payload_str);
         }
-        if (r_obj.heos.result !== "success") {
-            throw new CommandFailedException(commandStr);
-        }
-        for (const player of r_obj.payload) {
+        for (const player of payload) {
             if (player.serial === this.serialNumber) {
                 this.player_id = player.pid;
                 return;
@@ -86,61 +83,78 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     protected async subscribeToChangeEvents(): Promise<void> {
-        const commandStr = (DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_PREFIX + DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND + DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.PARAMS)
+        const commandStr = (DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND + DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.PARAMS)
             .replace("[VALUE]", DenonTelnetClientHeosCli.REVERSE_EVENT_SUB_VALUES[Number(true)]);
-        const responses = await this.sendUnchecked(commandStr);
-        for (const r of responses) {
-            let r_obj = JSON.parse(r);
-            if (r_obj.heos.command !== DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND) {
-                continue;
-            }
-            if (r_obj.heos.result === "success") {
-                return;
-            } else {
-                throw new CommandFailedException(commandStr);
-            }
-        }
-        throw new InvalidResponseException("No valid response!", [DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.MESSAGE], "");
-    }
+        const response = await this.sendUnchecked(commandStr);
 
-    private async sendCommandAndParseResponse(command: any, value?: any): Promise<string> {
-        if (!this.player_id) {
-            await this.findPlayerId();
+        if (!(response in DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.VALUES)) {
+            throw new InvalidResponseException("No valid response!", Object.keys(DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.VALUES), response);
         }
 
-        let commandStr = DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_PREFIX + command.COMMAND + command.PARAMS;
-        commandStr = commandStr.replace("[PID]", this.player_id!.toString());
-        if (value) {
-            commandStr = commandStr.replace("[VALUE]", value);
-        }
-
-        const response = await this.send(commandStr);
-
-        let expectedMessage = command.MESSAGE;
-        if (this.player_id) {
-            expectedMessage = expectedMessage.replace("[PID]", this.player_id.toString());
-        }
-        this.debugLog('Received response:', response);
-        const r_obj = JSON.parse(response)
-        if (r_obj.heos.command !== command.COMMAND) {
-            throw new InvalidResponseException("No valid response!", expectedMessage, r_obj.heos.command);
-        }
-        if (r_obj.heos.result !== "success") {
+        if (response !== DenonTelnetClientHeosCli.REVERSE_EVENT_SUB_VALUES[Number(true)]) {
             throw new CommandFailedException(commandStr);
         }
+    }
 
-        const captures = r_obj.heos.message.match(new RegExp(`^${expectedMessage}$`.replace("[VALUE]", "(\\w+)")));
-        if (captures && captures.length === 2) {
-            return captures[1];
+    protected async sendCommand(command: any, commandMode: CommandMode, { value, passPayload = false }: { value?: string, passPayload?: boolean }): Promise<string> {
+        if (!this.player_id) {
+            this.findPlayerId();
         }
-        else {
-            throw new InvalidResponseException("Result message unexpected", expectedMessage, r_obj.heos.message);
+        return super.sendCommand(command, commandMode, { pid: this.player_id, value: value, passPayload: passPayload });
+    }
+
+    protected responseRouter(response: string) {
+        let r_obj: any;
+        try {
+            r_obj = JSON.parse(response);
+        } catch (error) {
+            throw new InvalidResponseException("Received a response that is not valid JSON!", undefined, response);
+        }
+
+        if (!r_obj.heos || !r_obj.heos.message) {
+            throw new InvalidResponseException("Received response that does not follow HeosCLI specifications", undefined, response);
+        }
+
+        if (this.responseCallback && this.responseCallback.command === r_obj.heos.command.trim()) {
+            let out: string | undefined = undefined;
+            if (r_obj.heos.success && r_obj.heos.success !== "success") {
+                const error = new CommandFailedException(this.responseCallback.command);
+                this.responseCallback = undefined;
+                throw error;
+            }
+
+            let pid_match = r_obj.heos.message.match(DenonTelnetClientHeosCli.PROTOCOL.PID_REGEX);
+            if (!pid_match || pid_match === this.player_id) {
+                if (this.responseCallback.expectedResponse) {
+                    let match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
+                    if (match) {
+                        out = match[1];
+                    }
+                } else {
+                    out = r_obj.heos.message;
+                }
+            }
+
+            if (out) {
+                if (this.responseCallback.passPayload) {
+                    if (!r_obj.payload) {
+                        throw new InvalidResponseException("Received a response does not include a payload!");
+                    }
+                    out = JSON.stringify(r_obj.payload)
+                }
+
+                this.responseCallback.callback(out);
+                this.responseCallback = undefined;
+                if (this.params.all_responses_to_generic) {
+                    this.genericResponseHandler(r_obj);
+                }
+            }
+        } else {
+            this.genericResponseHandler(r_obj);
         }
     }
 
-    protected genericResponseHandler(response: string) {
-        const r_obj = JSON.parse(response)
-
+    private genericResponseHandler(r_obj: any) {
         if (!r_obj.heos.command.match(DenonTelnetClientHeosCli.PROTOCOL.GLOBAL_CHANGE_EVENT_REGEX)) {
             return; // not an event
         }
@@ -150,35 +164,29 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             return; // not this player
         }
 
-        this.debugLog('Received change event:', response);
+        this.debugLog('Received change event:', JSON.stringify(r_obj));
 
         switch (r_obj.heos.command) {
             case DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.EVENT:
-                const captures = r_obj.heos.message.match(new RegExp(`^${DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.MESSAGE}$`.replace("[PID]", this.player_id.toString()).replace("[VALUE]", "(\\w+)")));
-                if (captures && captures.length === 2 && captures[1] in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES && this.powerUpdateCallback) {
-                    this.powerUpdateCallback(IS_PLAYING[DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[captures[1] as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]);
+                const match = r_obj.heos.message.match(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.EXP_RES);
+                if (match && match[1] in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES && this.powerUpdateCallback) {
+                    this.powerUpdateCallback(IS_PLAYING[DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[match[1] as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]);
                 }
                 else {
-                    throw new InvalidResponseException("Event message unexpected", [DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET.MESSAGE], r_obj.heos.message);
+                    throw new InvalidResponseException("Unexpected play state", Object.keys(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), r_obj.heos.message);
                 }
                 break;
         }
     }
 
     public async getPlaying(): Promise<Playing> {
-        let response = await this.sendCommandAndParseResponse(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.GET);
-        if (response in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES) {
-            return DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
-        }
-        throw new InvalidResponseException("Unexpected play state", Object.keys(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), response);
+        let response = await this.sendCommand(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.GET, {});
+        return DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
     }
 
     public async setPlaying(playing: Playing): Promise<Playing> {
-        let response = await this.sendCommandAndParseResponse(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.SET, DenonTelnetClientHeosCli.REVERSE_PLAY_STATE_VALUES[playing]);
-        if (response in DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES) {
-            return DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
-        }
-        throw new InvalidResponseException("Unexpected play state", Object.keys(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), response);
+        let response = await this.sendCommand(DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.SET, { value: DenonTelnetClientHeosCli.REVERSE_PLAY_STATE_VALUES[playing] });
+        return DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonTelnetClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
     }
 
     public async getPower(raceStatus?: RaceStatus): Promise<boolean> {
