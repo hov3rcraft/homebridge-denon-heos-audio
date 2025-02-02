@@ -184,9 +184,8 @@ export abstract class DenonClient implements IDenonClient {
             setTimeout(() => {
                 reject(new ResponseTimeoutException(fullCommand, this.params.response_timeout));
             }, this.params.response_timeout);
-        }).catch((error) => {
+        }).finally(() => {
             this.responseCallback = undefined;
-            throw error; // TODO handle - this currently leads to homebridge shutting down
         });
     }
 

@@ -20,6 +20,7 @@ I am using the following devices for testing:
 - v0.4: Full control (via TV service) using the HeosCLI protocol and hybrid protocol
 
 ### Other planned improvements
+- robust handling of offline devices and disconnected devices
 - device auto-discovery when IP is not static and/or control protocol is not set
 
 ## Resources
