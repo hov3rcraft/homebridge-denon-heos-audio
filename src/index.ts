@@ -1,11 +1,11 @@
 import type { API } from 'homebridge';
 
-import { DenonTelnetPlatform } from './platform.js';
+import { DenonAudioPlatform } from './platform.js';
 import { PLATFORM_NAME } from './settings.js';
 
 /**
  * This method registers the platform with Homebridge
  */
 export default (api: API) => {
-  api.registerPlatform(PLATFORM_NAME, DenonTelnetPlatform);
+  api.registerPlatform(PLATFORM_NAME, DenonAudioPlatform);
 };

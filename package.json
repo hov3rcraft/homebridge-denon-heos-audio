@@ -1,18 +1,18 @@
 {
-  "name": "homebridge-denon-telnet-heoscli",
-  "displayName": "Homebridge Denon Telnet & HeosCLI",
+  "name": "homebridge-denon-audio-heos",
+  "displayName": "Homebridge Denon Audio Heos",
   "type": "module",
   "version": "0.2.0",
-  "description": "Control your Denon speakers via Telnet and/or HeosCLI",
+  "description": "Control your Denon speakers via AVR Control and/or HeosCLI",
   "author": "hov3rcraft",
   "license": "MIT",
-  "homepage": "https://github.com/hov3rcraft/homebridge-denon-telnet-heoscli#readme",
+  "homepage": "https://github.com/hov3rcraft/homebridge-denon-audio-heos#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hov3rcraft/homebridge-denon-telnet-heoscli.git"
+    "url": "https://github.com/hov3rcraft/homebridge-denon-audio-heos.git"
   },
   "bugs": {
-    "url": "https://github.com/hov3rcraft/homebridge-denon-telnet-heoscli/issues"
+    "url": "https://github.com/hov3rcraft/homebridge-denon-audio-heos/issues"
   },
   "keywords": [
     "homebridge",
@@ -22,7 +22,7 @@
     "avr",
     "speaker",
     "ceol",
-    "telnet",
+    "avrcontrol",
     "heoscli",
     "heos-cli"
   ],

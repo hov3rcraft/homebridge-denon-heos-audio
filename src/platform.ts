@@ -1,12 +1,12 @@
 import type { API, Characteristic, DynamicPlatformPlugin, Logger, LogLevel, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 import ssdp from '@achingbrain/ssdp';
 
-import { DenonTelnetAccessory } from './platformAccessory.js';
+import { DenonAudioAccessory as DenonAudioAccessory } from './platformAccessory.js';
 import { ConsoleLogger } from './consoleLogger.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { DenonTelnetClient, DenonTelnetMode } from './denonTelnetClient.js';
+import { DenonClient, DenonProtocol } from './denonClient.js';
 
-export class DenonTelnetPlatform implements DynamicPlatformPlugin {
+export class DenonAudioPlatform implements DynamicPlatformPlugin {
   public readonly log: Logger
   public readonly config: PlatformConfig
   public readonly api: API
@@ -74,7 +74,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
           this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
 
           // create the accessory handler for the restored accessory
-          new DenonTelnetAccessory(this, existingAccessory, deviceConfig, this.log);
+          new DenonAudioAccessory(this, existingAccessory, deviceConfig, this.log);
 
           // after it has been restored, the existing accessory should be removed form the uuid list
           existingAccessoriesUuids = existingAccessoriesUuids.filter(uuid => uuid !== existingAccessory.UUID);
@@ -90,7 +90,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
           accessory.context.device = deviceConfig;
 
           // create the accessory handler for the newly create accessory
-          new DenonTelnetAccessory(this, accessory, deviceConfig, this.log);
+          new DenonAudioAccessory(this, accessory, deviceConfig, this.log);
 
           // link the accessory to your platform
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -143,8 +143,8 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
         continue;
       }
 
-      log.debug('Checking telnet support for:', service.location.hostname);
-      const supportedModes = await DenonTelnetClient.checkTelnetSupport(service.location.hostname);
+      log.debug('Checking protocol support for:', service.location.hostname);
+      const supportedModes = await DenonClient.checkProtocolSupport(service.location.hostname);
       if (supportedModes.length === 0) {
         continue;
       }
@@ -155,7 +155,7 @@ export class DenonTelnetPlatform implements DynamicPlatformPlugin {
       log.success('Model name:   ', service.details?.device?.modelName);
       log.success('Serial number:', serial);
       log.success('IP address:   ', service.location.hostname);
-      log.success('Supported modes:', supportedModes.map(mode => DenonTelnetMode[mode]).join(', '));
+      log.success('Supported modes:', supportedModes.map(mode => DenonProtocol[mode]).join(', '));
       log.success('---------------------------------------------------------');
     }
   }

@@ -1,27 +1,27 @@
 import type { CharacteristicValue, Logger, PlatformAccessory, Service } from 'homebridge';
 
-import type { DenonTelnetPlatform } from './platform.js';
+import type { DenonAudioPlatform } from './platform.js';
 
 import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
-import { DenonTelnetClientAvrControl } from './denonTelnetClientAvrControl.js';
-import { DenonTelnetMode, IDenonTelnetClient, RaceStatus } from './denonTelnetClient.js';
-import { DenonTelnetClientHeosCli } from './denonTelnetClientHeosCli.js';
-import { DenonTelnetClientHybrid } from './denonTelnetClientHybrid.js';
+import { DenonClientAvrControl } from './denonClientAvrControl.js';
+import { DenonProtocol, IDenonClient, RaceStatus } from './denonClient.js';
+import { DenonClientHeosCli } from './denonClientHeosCli.js';
+import { DenonClientHybrid } from './denonClientHybrid.js';
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class DenonTelnetAccessory {
+export class DenonAudioAccessory {
   private static readonly CALLBACK_TIMEOUT = 1500;
   private static readonly API_CONNECT_TIMEOUT = 5000;
   private static readonly API_RESPONSE_TIMEOUT = 1000;
 
-  private readonly platform: DenonTelnetPlatform;
+  private readonly platform: DenonAudioPlatform;
   private readonly accessory: PlatformAccessory;
-  private readonly telnetClient: IDenonTelnetClient;
+  private readonly denonClient: IDenonClient;
   private readonly informationService: Service;
   private readonly switchService: Service;
   private readonly log: Logger;
@@ -29,10 +29,10 @@ export class DenonTelnetAccessory {
   private readonly name: string;
   private readonly ip: string;
   private readonly serialNumber: string;
-  private readonly telnetMode: DenonTelnetMode;
+  private readonly protocol: DenonProtocol;
 
-  constructor(platform: DenonTelnetPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
-    log.debug('Initializing DenonTelnetAccessory...');
+  constructor(platform: DenonAudioPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
+    log.debug('Initializing DenonAudioAccessory...');
 
     this.platform = platform;
     this.accessory = accessory;
@@ -41,7 +41,7 @@ export class DenonTelnetAccessory {
     this.name = accessory.displayName;
     this.ip = config.ip;
     this.serialNumber = config.serialNumber;
-    this.telnetMode = DenonTelnetMode[config.controlMode as keyof typeof DenonTelnetMode];
+    this.protocol = DenonProtocol[config.controlProtocol as keyof typeof DenonProtocol];
 
     // set accessory information
     this.informationService = this.accessory.getService(this.platform.Service.AccessoryInformation)!;
@@ -61,40 +61,40 @@ export class DenonTelnetAccessory {
       .onSet(this.setOn.bind(this));
 
 
-    // choose appropriate telnet client
-    switch (this.telnetMode) {
-      case DenonTelnetMode.AVRCONTROL:
-        this.telnetClient = new DenonTelnetClientAvrControl(
+    // choose appropriate client
+    switch (this.protocol) {
+      case DenonProtocol.AVRCONTROL:
+        this.denonClient = new DenonClientAvrControl(
           this.serialNumber,
           this.ip,
-          DenonTelnetAccessory.API_CONNECT_TIMEOUT,
-          DenonTelnetAccessory.API_RESPONSE_TIMEOUT,
+          DenonAudioAccessory.API_CONNECT_TIMEOUT,
+          DenonAudioAccessory.API_RESPONSE_TIMEOUT,
           this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         );
         break;
-      case DenonTelnetMode.HEOSCLI:
-        this.telnetClient = new DenonTelnetClientHeosCli(
+      case DenonProtocol.HEOSCLI:
+        this.denonClient = new DenonClientHeosCli(
           this.serialNumber,
           this.ip,
-          DenonTelnetAccessory.API_CONNECT_TIMEOUT,
-          DenonTelnetAccessory.API_RESPONSE_TIMEOUT,
+          DenonAudioAccessory.API_CONNECT_TIMEOUT,
+          DenonAudioAccessory.API_RESPONSE_TIMEOUT,
           this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         );
         break;
-      case DenonTelnetMode.HYBRID:
-        this.telnetClient = new DenonTelnetClientHybrid(
+      case DenonProtocol.HYBRID:
+        this.denonClient = new DenonClientHybrid(
           this.serialNumber,
           this.ip,
-          DenonTelnetAccessory.API_CONNECT_TIMEOUT,
-          DenonTelnetAccessory.API_RESPONSE_TIMEOUT,
+          DenonAudioAccessory.API_CONNECT_TIMEOUT,
+          DenonAudioAccessory.API_RESPONSE_TIMEOUT,
           this.callbackOn.bind(this),
           this.log.debug.bind(this.log)
         )
         break;
-      case DenonTelnetMode.AUTO:
-        throw new Error("AUTO control mode not implemented yet");
+      case DenonProtocol.AUTO:
+        throw new Error("AUTO control protocol not implemented yet");
     }
 
     this.log.info('Finished initializing accessory:', this.name);
@@ -139,12 +139,12 @@ export class DenonTelnetAccessory {
     try {
       this.log.debug(`getPower for ${this.name}. [race id: ${raceStatus.raceId}]`);
       return await Promise.race([
-        this.telnetClient.getPower(raceStatus),
+        this.denonClient.getPower(raceStatus),
         new Promise<boolean>((resolve, reject) => {
           setTimeout(() => {
             raceStatus.setRaceOver();
-            reject(new PromiseTimeoutException(DenonTelnetAccessory.CALLBACK_TIMEOUT))
-          }, DenonTelnetAccessory.CALLBACK_TIMEOUT);
+            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT))
+          }, DenonAudioAccessory.CALLBACK_TIMEOUT);
         })
       ]);
     } catch (error) {
@@ -171,7 +171,7 @@ export class DenonTelnetAccessory {
    */
   setOn(state: CharacteristicValue) {
     this.log.debug(`setPower for ${this.name} set to ${state}`);
-    this.telnetClient.setPower(state as boolean).catch((error) => {
+    this.denonClient.setPower(state as boolean).catch((error) => {
       this.log.error(`An error occured while setting power status for ${this.name}.`, error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     });

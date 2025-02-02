@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "DenonTelnetHeosCLI",
+  "pluginAlias": "DenonAudioHeos",
   "pluginType": "platform",
   "singular": true,
   "strictValidation": true,
@@ -38,8 +38,8 @@
               "format": "ipv4",
               "required": false
             },
-            "controlMode": {
-              "title": "Control Mode",
+            "controlProtocol": {
+              "title": "Control Protocol",
               "type": "string",
               "oneOf": [
                 {

@@ -1,7 +1,7 @@
 import { Mutex } from 'async-mutex';
 import * as net from 'net';
 
-export enum DenonTelnetMode {
+export enum DenonProtocol {
     AVRCONTROL = 23,
     HEOSCLI = 1255,
     HYBRID = -1,
@@ -25,7 +25,7 @@ export const IS_PLAYING: Record<Playing, boolean> = {
     [Playing.STOP]: false
 };
 
-interface IDenonTelnetClientConnectionParams {
+interface IDenonClientConnectionParams {
     readonly host: string;
     readonly port: number;
     readonly connect_timeout: number;
@@ -36,8 +36,8 @@ interface IDenonTelnetClientConnectionParams {
     readonly all_responses_to_generic: boolean;
 }
 
-export interface IDenonTelnetClient {
-    readonly mode: DenonTelnetMode;
+export interface IDenonClient {
+    readonly protocol: DenonProtocol;
     readonly serialNumber: string;
 
     isConnected(): boolean;
@@ -45,11 +45,11 @@ export interface IDenonTelnetClient {
     setPower(power: boolean): Promise<boolean>;
 }
 
-export abstract class DenonTelnetClient implements IDenonTelnetClient {
+export abstract class DenonClient implements IDenonClient {
     public readonly serialNumber: string;
     public readonly params;
     private socket: net.Socket | undefined;
-    public abstract readonly mode: DenonTelnetMode;
+    public abstract readonly protocol: DenonProtocol;
     private sendMutex;
     private dataEventMutex;
     private pendingData: string;
@@ -58,7 +58,7 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     protected powerUpdateCallback;
     protected debugLogCallback;
 
-    constructor(serialNumber: string, params: IDenonTelnetClientConnectionParams, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
+    constructor(serialNumber: string, params: IDenonClientConnectionParams, powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) {
         this.serialNumber = serialNumber;
         this.params = params;
 
@@ -221,38 +221,37 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
 
     public abstract setPower(power: boolean): Promise<boolean>;
 
-    private static checkTelnetAtPort(host: string, port: number): Promise<boolean> {
+    private static checkProtocolSupportAtPort(host: string, port: number): Promise<boolean> {
         return new Promise((resolve, reject) => {
             const socket = net.connect(port, host, () => {
-                // If the connection is successful
-                socket.end(); // Close the connection
-                resolve(true); // Telnet is supported
+                socket.end();
+                resolve(true);
             });
 
             socket.on('error', (err) => {
-                resolve(false); // Telnet is not supported or some error occurred
+                resolve(false);
             });
 
             socket.on('timeout', () => {
-                socket.end(); // Close the connection
-                resolve(false); // Telnet is not supported
+                socket.end();
+                resolve(false);
             });
 
-            socket.setTimeout(5000); // Set timeout to 5 seconds
+            socket.setTimeout(5000);
         });
     }
 
-    public static async checkTelnetSupport(host: string): Promise<DenonTelnetMode[]> {
-        let supportedModes = [];
-        for (const mode of Object.values(DenonTelnetMode).filter(value => typeof value === 'number')) {
-            if (mode >= 0) {
-                let supported = await DenonTelnetClient.checkTelnetAtPort(host, mode);
+    public static async checkProtocolSupport(host: string): Promise<DenonProtocol[]> {
+        let supportedProtocols = [];
+        for (const protocol of Object.values(DenonProtocol).filter(value => typeof value === 'number')) {
+            if (protocol >= 0) {
+                let supported = await DenonClient.checkProtocolSupportAtPort(host, protocol);
                 if (supported) {
-                    supportedModes.push(mode);
+                    supportedProtocols.push(protocol);
                 }
             }
         }
-        return supportedModes;
+        return supportedProtocols;
     }
 }
 
@@ -287,7 +286,7 @@ export class RaceStatus {
 
 export class ConnectionTimeoutException extends Error {
 
-    constructor(params: IDenonTelnetClientConnectionParams) {
+    constructor(params: IDenonClientConnectionParams) {
         super(`connection to ${params.host}:${params.port} timed out after ${params.connect_timeout}ms.`); // Pass the message to the parent Error class
         this.name = 'ConnectionTimeoutException'; // Set the error name
 
