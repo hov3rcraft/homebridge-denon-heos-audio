@@ -67,8 +67,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     }
 
     private async findPlayerId() {
-        const commandStr = DenonTelnetClientHeosCli.PROTOCOL.PLAYERS.GET.COMMAND;
-        const payload_str = await this.sendCommand(DenonTelnetClientHeosCli.PROTOCOL.PLAYERS, CommandMode.GET, { passPayload: true });
+        const payload_str = await super.sendCommand(DenonTelnetClientHeosCli.PROTOCOL.PLAYERS, CommandMode.GET, { passPayload: true });
         const payload = JSON.parse(payload_str);
         if (!Array.isArray(payload)) {
             throw new InvalidResponseException("Payload is not an array!", undefined, payload_str);
@@ -85,7 +84,7 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
     protected async subscribeToChangeEvents(): Promise<void> {
         const commandStr = (DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND + DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.PARAMS)
             .replace("[VALUE]", DenonTelnetClientHeosCli.REVERSE_EVENT_SUB_VALUES[Number(true)]);
-        const response = await this.sendUnchecked(commandStr);
+        const response = await this.sendUnchecked(commandStr, DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND, DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.SET.EXP_RES);
 
         if (!(response in DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.VALUES)) {
             throw new InvalidResponseException("No valid response!", Object.keys(DenonTelnetClientHeosCli.PROTOCOL.EVENT_SUB.VALUES), response);
@@ -111,37 +110,38 @@ export class DenonTelnetClientHeosCli extends DenonTelnetClient {
             throw new InvalidResponseException("Received a response that is not valid JSON!", undefined, response);
         }
 
-        if (!r_obj.heos || !r_obj.heos.message) {
+        if (r_obj.heos === undefined || r_obj.heos.message === undefined) {
             throw new InvalidResponseException("Received response that does not follow HeosCLI specifications", undefined, response);
         }
 
         if (this.responseCallback && this.responseCallback.command === r_obj.heos.command.trim()) {
             let out: string | undefined = undefined;
-            if (r_obj.heos.success && r_obj.heos.success !== "success") {
+            if (r_obj.heos.success !== undefined && r_obj.heos.success !== "success") {
                 const error = new CommandFailedException(this.responseCallback.command);
                 this.responseCallback = undefined;
                 throw error;
             }
 
             let pid_match = r_obj.heos.message.match(DenonTelnetClientHeosCli.PROTOCOL.PID_REGEX);
-            if (!pid_match || pid_match === this.player_id) {
+            if (!pid_match || Number(pid_match[1]) === this.player_id) {
                 if (this.responseCallback.expectedResponse) {
-                    let match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
-                    if (match) {
-                        out = match[1];
+                    let value_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
+                    if (value_match) {
+                        out = value_match[1];
                     }
                 } else {
                     out = r_obj.heos.message;
                 }
             }
 
-            if (out) {
+            if (out !== undefined) {
                 if (this.responseCallback.passPayload) {
-                    if (!r_obj.payload) {
+                    if (r_obj.payload === undefined) {
                         throw new InvalidResponseException("Received a response does not include a payload!");
                     }
                     out = JSON.stringify(r_obj.payload)
                 }
+                this.debugLog('Received response:', response);
 
                 this.responseCallback.callback(out);
                 this.responseCallback = undefined;

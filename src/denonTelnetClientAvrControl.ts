@@ -46,25 +46,27 @@ export class DenonTelnetClientAvrControl extends DenonTelnetClient {
 
     protected responseRouter(response: string) {
         if (this.responseCallback) {
+            let out: string | undefined = undefined;
             if (this.responseCallback.expectedResponse) {
                 let match = response.match(this.responseCallback.expectedResponse);
                 if (match) {
-                    this.responseCallback.callback(match[1] ?? match[0]);
-                    this.responseCallback = undefined;
-                    if (!this.params.all_responses_to_generic) {
-                        return;
-                    }
+                    out = match[1] ?? match[0];
                 }
             } else {
-                this.responseCallback.callback(response);
+                out = response;
+            }
+
+            if (out) {
+                this.debugLog('Received response:', response);
+                this.responseCallback.callback(out);
                 this.responseCallback = undefined;
-                if (!this.params.all_responses_to_generic) {
-                    return;
+                if (this.params.all_responses_to_generic) {
+                    this.genericResponseHandler(response);
                 }
             }
+        } else {
+            this.genericResponseHandler(response);
         }
-
-        this.genericResponseHandler(response);
     }
 
     private genericResponseHandler(response: string) {

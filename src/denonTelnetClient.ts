@@ -174,22 +174,20 @@ export abstract class DenonTelnetClient implements IDenonTelnetClient {
     }
 
     protected async sendUnchecked(command: string, rawCommand?: string, expectedResponse?: RegExp, passPayload: boolean = false): Promise<string> {
-        try {
-            return new Promise<string>((resolve, reject) => {
-                const fullCommand = (this.params.command_prefix) ? this.params.command_prefix + command : command;
-                this.debugLog('Sending command:', fullCommand);
-                this.responseCallback = new ResponseCallback((response) => {
-                    resolve(response);
-                }, rawCommand ?? command, expectedResponse, passPayload);
-                this.socket!.write(fullCommand + this.params.command_separator);
-                setTimeout(() => {
-                    reject(new ResponseTimeoutException(fullCommand, this.params.response_timeout));
-                }, this.params.response_timeout);
-            });
-        } catch (error) {
+        return new Promise<string>((resolve, reject) => {
+            const fullCommand = (this.params.command_prefix) ? this.params.command_prefix + command : command;
+            this.debugLog('Sending command:', fullCommand);
+            this.responseCallback = new ResponseCallback((response) => {
+                resolve(response);
+            }, rawCommand ?? command, expectedResponse, passPayload);
+            this.socket!.write(fullCommand + this.params.command_separator);
+            setTimeout(() => {
+                reject(new ResponseTimeoutException(fullCommand, this.params.response_timeout));
+            }, this.params.response_timeout);
+        }).catch((error) => {
             this.responseCallback = undefined;
-            throw error;
-        }
+            throw error; // TODO handle - this currently leads to homebridge shutting down
+        });
     }
 
     private async dataHandler(incomingData: any) {
