@@ -1,23 +1,6 @@
 import { Mutex } from 'async-mutex';
 import * as net from 'net';
 
-export enum CommandMode {
-    GET,
-    SET
-}
-
-export enum Playing {
-    PLAY,
-    PAUSE,
-    STOP
-}
-
-export const IS_PLAYING: Record<Playing, boolean> = {
-    [Playing.PLAY]: true,
-    [Playing.PAUSE]: false,
-    [Playing.STOP]: false
-};
-
 interface IDenonClientConnectionParams {
     readonly host: string;
     readonly port: number;
@@ -95,15 +78,24 @@ export abstract class DenonClient implements IDenonClient {
 
                 // Listen for connection closure events
                 newSocket.on('timeout', () => {
-                    // TODO
+                    // TODO - right now we do not have client-side timeouts
+                    this.socket = undefined;
                 })
                 newSocket.on('close', () => {
-                    this.socket = undefined;
-                });
-                newSocket.on('end', () => {
+                    this.debugLog("Connection has closed.");
+                    newSocket?.destroy();
                     this.socket = undefined;
                 });
                 newSocket.on('error', (error) => {
+                    this.debugLog("Received an error from the server.", error);
+                    newSocket?.end();
+                    setTimeout(() => {
+                        // give the server 2 seconds to gracefully close the connection, then force the issue
+                        if (!newSocket?.destroyed) {
+                            this.debugLog("Connection destroyed.");
+                            newSocket?.destroy();
+                        }
+                    }, 2000);
                     this.socket = undefined;
                     reject(error);
                 });
@@ -211,6 +203,11 @@ export abstract class DenonClient implements IDenonClient {
     public abstract getPower(raceStatus?: RaceStatus): Promise<boolean>;
 
     public abstract setPower(power: boolean): Promise<boolean>;
+}
+
+export enum CommandMode {
+    GET,
+    SET
 }
 
 class ResponseCallback {

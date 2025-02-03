@@ -13,6 +13,7 @@ export enum DenonProtocol {
 }
 
 export namespace DenonProtocol {
+
     export const CLIENT_MAP: Record<DenonProtocol, new (serialNumber: string, host: string, connect_timeout: number, response_timeout: number,
         powerUpdateCallback?: (power: boolean) => void, debugLogCallback?: (message: string, ...parameters: any[]) => void) => IDenonClient> = {
         [DenonProtocol.AVRCONTROL]: DenonClientAvrControl,
@@ -23,20 +24,29 @@ export namespace DenonProtocol {
     function checkProtocolSupportAtPort(host: string, port: number): Promise<boolean> {
         return new Promise((resolve, reject) => {
             const socket = net.connect(port, host, () => {
-                socket.end();
                 resolve(true);
+                socket.end();
             });
 
             socket.on('error', (err) => {
                 resolve(false);
+                socket.end();
             });
 
             socket.on('timeout', () => {
-                socket.end();
                 resolve(false);
+                socket.end();
             });
 
             socket.setTimeout(5000);
+
+            setTimeout(() => {
+                // if graceful termination has failed, destroy the socket.
+                if (!socket.destroyed) {
+                    console.log("destroying the socket", host, port);
+                    socket.destroy();
+                }
+            }, 1000);
         });
     }
 
@@ -52,4 +62,18 @@ export namespace DenonProtocol {
         }
         return supportedProtocols;
     }
+}
+
+export enum Playing {
+    PLAY,
+    PAUSE,
+    STOP
+}
+
+export namespace Playing {
+    export const isPlaying: Record<Playing, boolean> = {
+        [Playing.PLAY]: true,
+        [Playing.PAUSE]: false,
+        [Playing.STOP]: false
+    };
 }

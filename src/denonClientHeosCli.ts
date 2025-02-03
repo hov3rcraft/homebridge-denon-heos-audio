@@ -1,5 +1,5 @@
-import { CommandFailedException, CommandMode, DenonClient, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonClient.js";
-import { DenonProtocol } from "./denonProtocol.js";
+import { CommandFailedException, CommandMode, DenonClient, InvalidResponseException, RaceStatus } from "./denonClient.js";
+import { DenonProtocol, Playing } from "./denonProtocol.js";
 
 export class DenonClientHeosCli extends DenonClient {
 
@@ -171,7 +171,7 @@ export class DenonClientHeosCli extends DenonClient {
             case DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EVENT:
                 const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EXP_RES);
                 if (match && match[1] in DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES && this.powerUpdateCallback) {
-                    this.powerUpdateCallback(IS_PLAYING[DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[match[1] as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]);
+                    this.powerUpdateCallback(Playing.isPlaying[DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[match[1] as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]);
                 }
                 else {
                     throw new InvalidResponseException("Unexpected play state", Object.keys(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), r_obj.heos.message);
@@ -193,25 +193,25 @@ export class DenonClientHeosCli extends DenonClient {
     public async getPower(raceStatus?: RaceStatus): Promise<boolean> {
         const playing = await this.getPlaying();
         if (raceStatus && !raceStatus.isRunning() && this.powerUpdateCallback) {
-            this.powerUpdateCallback(IS_PLAYING[playing]);
+            this.powerUpdateCallback(Playing.isPlaying[playing]);
             this.debugLog(`getPower was late to the party [race id: ${raceStatus.raceId}].`);
         }
-        return IS_PLAYING[playing];
+        return Playing.isPlaying[playing];
     }
 
     public async setPower(power: boolean): Promise<boolean> {
         const newPlaying = await this.setPlaying(power ? Playing.PLAY : Playing.STOP);
         if (this.powerUpdateCallback) {
-            this.powerUpdateCallback(IS_PLAYING[newPlaying]);
+            this.powerUpdateCallback(Playing.isPlaying[newPlaying]);
         }
-        return IS_PLAYING[newPlaying];
+        return Playing.isPlaying[newPlaying];
     }
 
     public async getPlay(): Promise<boolean> {
-        return IS_PLAYING[await this.getPlaying()];
+        return Playing.isPlaying[await this.getPlaying()];
     }
 
     public async setPlay(play: boolean): Promise<boolean> {
-        return IS_PLAYING[await this.setPlaying(play ? Playing.PLAY : Playing.PAUSE)]
+        return Playing.isPlaying[await this.setPlaying(play ? Playing.PLAY : Playing.PAUSE)]
     }
 }
