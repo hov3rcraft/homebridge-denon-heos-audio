@@ -132,14 +132,6 @@ export class DenonAudioAccessory {
     }
   }
 
-  getManufacturer(): CharacteristicValue {
-    return this.platform.ssdpDiscoveredDevices.get(this.serialNumber)?.details?.device?.manufacturer || 'unknown';
-  }
-
-  getModel(): CharacteristicValue {
-    return this.platform.ssdpDiscoveredDevices.get(this.serialNumber)?.details?.device?.modelName || 'unknown';
-  }
-
   /**
    * Handle "SET" requests from HomeKit
    * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
