@@ -1,5 +1,19 @@
 import { CommandFailedException, CommandMode, DenonClient, InvalidResponseException, RaceStatus } from "./denonClient.js";
-import { DenonProtocol, Playing } from "./denonProtocol.js";
+import { DenonProtocol } from "./denonProtocol.js";
+
+enum Playing {
+    PLAY,
+    PAUSE,
+    STOP
+}
+
+namespace Playing {
+    export const isPlaying: Record<Playing, boolean> = {
+        [Playing.PLAY]: true,
+        [Playing.PAUSE]: false,
+        [Playing.STOP]: false
+    };
+}
 
 export class DenonClientHeosCli extends DenonClient {
 

@@ -63,17 +63,3 @@ export namespace DenonProtocol {
         return supportedProtocols;
     }
 }
-
-export enum Playing {
-    PLAY,
-    PAUSE,
-    STOP
-}
-
-export namespace Playing {
-    export const isPlaying: Record<Playing, boolean> = {
-        [Playing.PLAY]: true,
-        [Playing.PAUSE]: false,
-        [Playing.STOP]: false
-    };
-}
