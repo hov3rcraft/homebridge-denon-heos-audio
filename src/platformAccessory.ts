@@ -5,9 +5,10 @@ import type { DenonAudioPlatform } from './platform.js';
 import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
 import { DenonClientAvrControl } from './denonClientAvrControl.js';
-import { DenonProtocol, IDenonClient, RaceStatus } from './denonClient.js';
+import { IDenonClient, RaceStatus } from './denonClient.js';
 import { DenonClientHeosCli } from './denonClientHeosCli.js';
 import { DenonClientHybrid } from './denonClientHybrid.js';
+import { DenonProtocol } from './denonProtocol.js';
 
 /**
  * Platform Accessory
@@ -16,8 +17,8 @@ import { DenonClientHybrid } from './denonClientHybrid.js';
  */
 export class DenonAudioAccessory {
   private static readonly CALLBACK_TIMEOUT = 1500;
-  private static readonly API_CONNECT_TIMEOUT = 5000;
-  private static readonly API_RESPONSE_TIMEOUT = 1000;
+  private static readonly API_CONNECT_TIMEOUT = 5 * 1000;
+  private static readonly API_RESPONSE_TIMEOUT = 1 * 1000;
 
   private readonly platform: DenonAudioPlatform;
   private readonly accessory: PlatformAccessory;
@@ -41,7 +42,7 @@ export class DenonAudioAccessory {
     this.name = accessory.displayName;
     this.ip = config.ip;
     this.serialNumber = config.serialNumber;
-    this.protocol = DenonProtocol[config.controlProtocol as keyof typeof DenonProtocol];
+    this.protocol = DenonProtocol[config.controlProtocol as keyof typeof DenonProtocol] as DenonProtocol;
 
     // set accessory information
     this.informationService = this.accessory.getService(this.platform.Service.AccessoryInformation)!;
@@ -62,40 +63,14 @@ export class DenonAudioAccessory {
 
 
     // choose appropriate client
-    switch (this.protocol) {
-      case DenonProtocol.AVRCONTROL:
-        this.denonClient = new DenonClientAvrControl(
-          this.serialNumber,
-          this.ip,
-          DenonAudioAccessory.API_CONNECT_TIMEOUT,
-          DenonAudioAccessory.API_RESPONSE_TIMEOUT,
-          this.callbackOn.bind(this),
-          this.log.debug.bind(this.log)
-        );
-        break;
-      case DenonProtocol.HEOSCLI:
-        this.denonClient = new DenonClientHeosCli(
-          this.serialNumber,
-          this.ip,
-          DenonAudioAccessory.API_CONNECT_TIMEOUT,
-          DenonAudioAccessory.API_RESPONSE_TIMEOUT,
-          this.callbackOn.bind(this),
-          this.log.debug.bind(this.log)
-        );
-        break;
-      case DenonProtocol.HYBRID:
-        this.denonClient = new DenonClientHybrid(
-          this.serialNumber,
-          this.ip,
-          DenonAudioAccessory.API_CONNECT_TIMEOUT,
-          DenonAudioAccessory.API_RESPONSE_TIMEOUT,
-          this.callbackOn.bind(this),
-          this.log.debug.bind(this.log)
-        )
-        break;
-      case DenonProtocol.AUTO:
-        throw new Error("AUTO control protocol not implemented yet");
-    }
+    this.denonClient = new DenonProtocol.CLIENT_MAP[this.protocol](
+      this.serialNumber,
+      this.ip,
+      DenonAudioAccessory.API_CONNECT_TIMEOUT,
+      DenonAudioAccessory.API_RESPONSE_TIMEOUT,
+      this.callbackOn.bind(this),
+      this.log.debug.bind(this.log)
+    );
 
     this.log.info('Finished initializing accessory:', this.name);
   }

@@ -1,4 +1,5 @@
-import { CommandMode, DenonClient, DenonProtocol, InvalidResponseException } from "./denonClient.js";
+import { CommandMode, DenonClient, InvalidResponseException } from "./denonClient.js";
+import { DenonProtocol } from "./denonProtocol.js";
 
 export class DenonClientAvrControl extends DenonClient {
 

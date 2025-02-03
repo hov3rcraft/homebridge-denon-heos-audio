@@ -4,7 +4,8 @@ import ssdp from '@achingbrain/ssdp';
 import { DenonAudioAccessory as DenonAudioAccessory } from './platformAccessory.js';
 import { ConsoleLogger } from './consoleLogger.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { DenonClient, DenonProtocol } from './denonClient.js';
+import { DenonClient } from './denonClient.js';
+import { DenonProtocol } from './denonProtocol.js';
 
 export class DenonAudioPlatform implements DynamicPlatformPlugin {
   public readonly log: Logger
@@ -144,7 +145,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
       }
 
       log.debug('Checking protocol support for:', service.location.hostname);
-      const supportedModes = await DenonClient.checkProtocolSupport(service.location.hostname);
+      const supportedModes = await DenonProtocol.checkProtocolSupport(service.location.hostname);
       if (supportedModes.length === 0) {
         continue;
       }

@@ -1,13 +1,6 @@
 import { Mutex } from 'async-mutex';
 import * as net from 'net';
 
-export enum DenonProtocol {
-    AVRCONTROL = 23,
-    HEOSCLI = 1255,
-    HYBRID = -1,
-    AUTO = -2
-}
-
 export enum CommandMode {
     GET,
     SET
@@ -37,7 +30,6 @@ interface IDenonClientConnectionParams {
 }
 
 export interface IDenonClient {
-    readonly protocol: DenonProtocol;
     readonly serialNumber: string;
 
     isConnected(): boolean;
@@ -46,10 +38,10 @@ export interface IDenonClient {
 }
 
 export abstract class DenonClient implements IDenonClient {
+
     public readonly serialNumber: string;
     public readonly params;
     private socket: net.Socket | undefined;
-    public abstract readonly protocol: DenonProtocol;
     private sendMutex;
     private dataEventMutex;
     private pendingData: string;
@@ -219,39 +211,6 @@ export abstract class DenonClient implements IDenonClient {
     public abstract getPower(raceStatus?: RaceStatus): Promise<boolean>;
 
     public abstract setPower(power: boolean): Promise<boolean>;
-
-    private static checkProtocolSupportAtPort(host: string, port: number): Promise<boolean> {
-        return new Promise((resolve, reject) => {
-            const socket = net.connect(port, host, () => {
-                socket.end();
-                resolve(true);
-            });
-
-            socket.on('error', (err) => {
-                resolve(false);
-            });
-
-            socket.on('timeout', () => {
-                socket.end();
-                resolve(false);
-            });
-
-            socket.setTimeout(5000);
-        });
-    }
-
-    public static async checkProtocolSupport(host: string): Promise<DenonProtocol[]> {
-        let supportedProtocols = [];
-        for (const protocol of Object.values(DenonProtocol).filter(value => typeof value === 'number')) {
-            if (protocol >= 0) {
-                let supported = await DenonClient.checkProtocolSupportAtPort(host, protocol);
-                if (supported) {
-                    supportedProtocols.push(protocol);
-                }
-            }
-        }
-        return supportedProtocols;
-    }
 }
 
 class ResponseCallback {

@@ -1,4 +1,5 @@
-import { CommandFailedException, CommandMode, DenonClient, DenonProtocol, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonClient.js";
+import { CommandFailedException, CommandMode, DenonClient, InvalidResponseException, IS_PLAYING, Playing, RaceStatus } from "./denonClient.js";
+import { DenonProtocol } from "./denonProtocol.js";
 
 export class DenonClientHeosCli extends DenonClient {
 

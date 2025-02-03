@@ -1,6 +1,7 @@
-import { IDenonClient, DenonProtocol, RaceStatus } from "./denonClient.js";
+import { IDenonClient, RaceStatus } from "./denonClient.js";
 import { DenonClientAvrControl } from "./denonClientAvrControl.js";
 import { DenonClientHeosCli } from "./denonClientHeosCli.js";
+import { DenonProtocol } from "./denonProtocol.js";
 
 export class DenonClientHybrid implements IDenonClient {
 
