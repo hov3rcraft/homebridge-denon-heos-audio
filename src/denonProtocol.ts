@@ -23,7 +23,7 @@ export namespace DenonProtocol {
 
     function checkProtocolSupportAtPort(host: string, port: number, debugLogCallback?: (message: string, ...parameters: any[]) => void): Promise<boolean> {
         return new Promise((resolve, reject) => {
-            const socket = net.connect(port, host, () => {
+            const socket = net.createConnection({ host: host, port: port, timeout: 5000 }, () => {
                 resolve(true);
                 if (debugLogCallback) {
                     debugLogCallback("successfully connected to", host, port);
@@ -34,7 +34,7 @@ export namespace DenonProtocol {
             socket.on('error', (error) => {
                 resolve(false);
                 if (debugLogCallback) {
-                    debugLogCallback("error for", host, port, error);
+                    debugLogCallback("error for", host, port, error.message);
                 }
                 socket.end();
             });
@@ -47,17 +47,14 @@ export namespace DenonProtocol {
                 socket.end();
             });
 
-            socket.setTimeout(5000);
-
             setTimeout(() => {
-                // if graceful termination has failed, destroy the socket.
                 if (!socket.destroyed) {
                     if (debugLogCallback) {
                         debugLogCallback("destroying the socket", host, port);
                     }
                     socket.destroy();
                 }
-            }, 1000);
+            }, 10000);
         });
     }
 

@@ -54,7 +54,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
 
   discoverDevices() {
     if (this.config.deviceDiscovery) {
-      this.discoverSsdpDevices(this.log);
+      this.discoverSsdpDevices();
     }
 
     let existingAccessoriesUuids = Array.from(this.accessories.keys());
@@ -110,55 +110,88 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  async discoverSsdpDevices(log: Logger) {
+  async discoverSsdpDevices() {
     const bus = await ssdp();
+    let errorOccurred = false;
 
-    for await (const service of bus.discover()) {
-      const serial = service.details?.device?.serialNumber;
-
-      if (!serial) {
-        continue;
+    bus.on('error', (error) => {
+      if (!errorOccurred) {
+        this.log.warn("Error in the device discovery service. Shutting it down. New devices will no longer be discovered.");
+        this.log.debug("Error that caused the warning above:", error);
+        errorOccurred = true;
+        bus.stop().catch(() => { });
       }
+    });
 
-      if (this.ssdpDiscoveredDevices.has(serial)) {
-        continue;
-      }
+    const discoverIterator = bus.discover();
 
-      this.ssdpDiscoveredDevices.set(serial, service);
-
-      if (!JSON.stringify(service).toLowerCase().includes("denon")) {
-        continue;
-      }
-
-      if (!service.location.href) {
-        continue;
-      }
-
+    // Loop until an error occurs or the iterator is done
+    while (!errorOccurred) {
+      let service;
       try {
-        const response = await fetch(service.location.href);
-        if (!response.ok) {
-          log.debug(`Received a non-200 status code while connecting to a new device's location href (status code: ${response.status}).`);
-          continue;
-        }
+        const { value: serviceFound, done } = await discoverIterator.next();
+        if (done) break; // End of discovery
+        if (errorOccurred) break;
+        service = serviceFound;
       } catch (error) {
-        log.debug("An error occured while connecting to a new device's location href.", error);
-        continue;
+        // Catch errors from the async iterator
+        if (!errorOccurred) {
+          this.log.warn("Error in the device discovery service. Shutting it down. New devices will no longer be discovered.");
+          this.log.debug("Error that caused the warning above:", error);
+          errorOccurred = true;
+          bus.stop().catch(() => { });
+        }
       }
-
-      log.debug('Checking protocol support for:', service.location.hostname);
-      const supportedModes = await DenonProtocol.checkProtocolSupport(service.location.hostname, this.log.debug.bind(this.log));
-      if (supportedModes.length === 0) {
-        continue;
-      }
-
-      log.success('---------------------------------------------------------');
-      log.success('Found DENON device in local network:');
-      log.success('Friendly name:', service.details?.device?.friendlyName);
-      log.success('Model name:   ', service.details?.device?.modelName);
-      log.success('Serial number:', serial);
-      log.success('IP address:   ', service.location.hostname);
-      log.success('Supported modes:', supportedModes.map(mode => DenonProtocol[mode]).join(', '));
-      log.success('---------------------------------------------------------');
+      await this.checkSsdpDevice(service);
     }
+  }
+
+  async checkSsdpDevice(service: any) {
+    const serial = service?.details?.device?.serialNumber;
+
+    if (!serial) {
+      return;
+    }
+
+    if (this.ssdpDiscoveredDevices.has(serial)) {
+      return;
+    }
+
+    this.ssdpDiscoveredDevices.set(serial, service);
+
+    if (!JSON.stringify(service).toLowerCase().includes("denon")) {
+      return;
+    }
+
+    if (!service.location.href) {
+      return;
+    }
+
+    try {
+      const response = await fetch(service.location.href);
+      response.body?.cancel();
+      if (!response.ok) {
+        this.log.debug(`Received a non-200 status code while connecting to a new device's location href (status code: ${response.status}).`);
+        return;
+      }
+    } catch (error) {
+      this.log.debug("An error occured while connecting to a new device's location href.", error);
+      return;
+    }
+
+    this.log.debug('Checking protocol support for:', service.location.hostname);
+    const supportedModes = await DenonProtocol.checkProtocolSupport(service.location.hostname, this.log.debug.bind(this.log));
+    if (supportedModes.length === 0) {
+      return;
+    }
+
+    this.log.success('-------------------------------------------------------');
+    this.log.success('Found DENON device in local network:');
+    this.log.success('Friendly name:', service.details?.device?.friendlyName);
+    this.log.success('Model name:   ', service.details?.device?.modelName);
+    this.log.success('Serial number:', serial);
+    this.log.success('IP address:   ', service.location.hostname);
+    this.log.success('Supported modes:', supportedModes.map(mode => DenonProtocol[mode]).join(', '));
+    this.log.success('-------------------------------------------------------');
   }
 }
