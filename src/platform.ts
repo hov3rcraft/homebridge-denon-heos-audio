@@ -2,12 +2,12 @@ import type { API, Characteristic, DynamicPlatformPlugin, Logger, LogLevel, Plat
 import ssdp from '@achingbrain/ssdp';
 
 import { DenonAudioAccessory as DenonAudioAccessory } from './platformAccessory.js';
-import { ConsoleLogger } from './consoleLogger.js';
+import { CustomLogging } from './customLogging.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { DenonClient } from './denonClient.js';
 import { DenonProtocol } from './denonProtocol.js';
 
 export class DenonAudioPlatform implements DynamicPlatformPlugin {
+  public readonly rawLog: Logger
   public readonly log: Logger
   public readonly config: PlatformConfig
   public readonly api: API
@@ -20,7 +20,8 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
   public readonly ssdpDiscoveredDevices = new Map<string, any>();
 
   constructor(log: Logger, config: PlatformConfig, api: API,) {
-    this.log = config.consoleLogEnabled ? new ConsoleLogger(ConsoleLogger.logLevelFromString[config.consoleLogLevel], "homebridge-eufy-robovac:") : log;
+    this.rawLog = config.consoleLogEnabled ? new CustomLogging.ConsoleLogger(CustomLogging.logLevelFromString[config.consoleLogLevel], PLUGIN_NAME) : log;
+    this.log = new CustomLogging.LoggerPrefixWrapper(this.rawLog, "Platform");
     this.config = config;
     this.api = api;
 
@@ -75,7 +76,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
           this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
 
           // create the accessory handler for the restored accessory
-          new DenonAudioAccessory(this, existingAccessory, deviceConfig, this.log);
+          new DenonAudioAccessory(this, existingAccessory, deviceConfig, this.rawLog);
 
           // after it has been restored, the existing accessory should be removed form the uuid list
           existingAccessoriesUuids = existingAccessoriesUuids.filter(uuid => uuid !== existingAccessory.UUID);
@@ -91,7 +92,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
           accessory.context.device = deviceConfig;
 
           // create the accessory handler for the newly create accessory
-          new DenonAudioAccessory(this, accessory, deviceConfig, this.log);
+          new DenonAudioAccessory(this, accessory, deviceConfig, this.rawLog);
 
           // link the accessory to your platform
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

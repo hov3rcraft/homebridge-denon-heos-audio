@@ -9,6 +9,7 @@ import { IDenonClient, RaceStatus } from './denonClient.js';
 import { DenonClientHeosCli } from './denonClientHeosCli.js';
 import { DenonClientHybrid } from './denonClientHybrid.js';
 import { DenonProtocol } from './denonProtocol.js';
+import { CustomLogging } from './customLogging.js';
 
 /**
  * Platform Accessory
@@ -25,6 +26,7 @@ export class DenonAudioAccessory {
   private readonly denonClient: IDenonClient;
   private readonly informationService: Service;
   private readonly switchService: Service;
+  private readonly rawLog: Logger;
   private readonly log: Logger;
 
   private readonly name: string;
@@ -37,7 +39,8 @@ export class DenonAudioAccessory {
 
     this.platform = platform;
     this.accessory = accessory;
-    this.log = log;
+    this.rawLog = log;
+    this.log = new CustomLogging.LoggerPrefixWrapper(this.rawLog, accessory.displayName)
 
     this.name = accessory.displayName;
     this.ip = config.ip;
@@ -72,7 +75,7 @@ export class DenonAudioAccessory {
       this.log.debug.bind(this.log)
     );
 
-    this.log.info('Finished initializing accessory:', this.name);
+    this.log.info('Finished initializing accessory.');
   }
 
   private fetchMetadataAios() {
