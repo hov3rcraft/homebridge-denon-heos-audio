@@ -4,10 +4,7 @@ import type { DenonAudioPlatform } from './platform.js';
 
 import { DOMParser } from '@xmldom/xmldom'
 import { PromiseTimeoutException } from './promiseTimeoutException.js';
-import { DenonClientAvrControl } from './denonClientAvrControl.js';
 import { IDenonClient, RaceStatus } from './denonClient.js';
-import { DenonClientHeosCli } from './denonClientHeosCli.js';
-import { DenonClientHybrid } from './denonClientHybrid.js';
 import { DenonProtocol } from './denonProtocol.js';
 import { CustomLogging } from './customLogging.js';
 

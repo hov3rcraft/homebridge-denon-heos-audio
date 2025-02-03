@@ -20,7 +20,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
   public readonly ssdpDiscoveredDevices = new Map<string, any>();
 
   constructor(log: Logger, config: PlatformConfig, api: API,) {
-    this.rawLog = config.consoleLogEnabled ? new CustomLogging.ConsoleLogger(CustomLogging.logLevelFromString[config.consoleLogLevel], PLUGIN_NAME) : log;
+    this.rawLog = config.consoleLogEnabled ? new CustomLogging.ConsoleLogger(CustomLogging.logLevelFromString[config.consoleLogLevel], PLUGIN_NAME, true) : log;
     this.log = new CustomLogging.LoggerPrefixWrapper(this.rawLog, "Platform");
     this.config = config;
     this.api = api;
@@ -146,7 +146,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
       }
 
       log.debug('Checking protocol support for:', service.location.hostname);
-      const supportedModes = await DenonProtocol.checkProtocolSupport(service.location.hostname);
+      const supportedModes = await DenonProtocol.checkProtocolSupport(service.location.hostname, this.log.debug.bind(this.log));
       if (supportedModes.length === 0) {
         continue;
       }

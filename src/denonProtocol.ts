@@ -21,20 +21,29 @@ export namespace DenonProtocol {
         [DenonProtocol.HYBRID]: DenonClientHybrid,
     }
 
-    function checkProtocolSupportAtPort(host: string, port: number): Promise<boolean> {
+    function checkProtocolSupportAtPort(host: string, port: number, debugLogCallback?: (message: string, ...parameters: any[]) => void): Promise<boolean> {
         return new Promise((resolve, reject) => {
             const socket = net.connect(port, host, () => {
                 resolve(true);
+                if (debugLogCallback) {
+                    debugLogCallback("successfully connected to", host, port);
+                }
                 socket.end();
             });
 
-            socket.on('error', (err) => {
+            socket.on('error', (error) => {
                 resolve(false);
+                if (debugLogCallback) {
+                    debugLogCallback("error for", host, port, error);
+                }
                 socket.end();
             });
 
             socket.on('timeout', () => {
                 resolve(false);
+                if (debugLogCallback) {
+                    debugLogCallback("timeout for", host, port);
+                }
                 socket.end();
             });
 
@@ -43,18 +52,20 @@ export namespace DenonProtocol {
             setTimeout(() => {
                 // if graceful termination has failed, destroy the socket.
                 if (!socket.destroyed) {
-                    console.log("destroying the socket", host, port);
+                    if (debugLogCallback) {
+                        debugLogCallback("destroying the socket", host, port);
+                    }
                     socket.destroy();
                 }
             }, 1000);
         });
     }
 
-    export async function checkProtocolSupport(host: string): Promise<DenonProtocol[]> {
+    export async function checkProtocolSupport(host: string, debugLogCallback?: (message: string, ...parameters: any[]) => void): Promise<DenonProtocol[]> {
         let supportedProtocols = [];
         for (const protocol of Object.values(DenonProtocol).filter(value => typeof value === 'number')) {
             if (protocol >= 0) {
-                let supported = await checkProtocolSupportAtPort(host, protocol);
+                let supported = await checkProtocolSupportAtPort(host, protocol, debugLogCallback);
                 if (supported) {
                     supportedProtocols.push(protocol);
                 }

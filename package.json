@@ -52,6 +52,7 @@
   "dependencies": {
     "@achingbrain/ssdp": "^4.2.1",
     "@xmldom/xmldom": "^0.9.7",
-    "async-mutex": "^0.5.0"
+    "async-mutex": "^0.5.0",
+    "date-fns": "^4.1.0"
   }
 }

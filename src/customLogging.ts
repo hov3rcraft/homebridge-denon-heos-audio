@@ -1,4 +1,5 @@
 import { Logger, LogLevel } from "homebridge";
+import { format } from 'date-fns';
 
 export namespace CustomLogging {
     export const logLevelNumeric: Record<LogLevel, number> = {
@@ -19,25 +20,26 @@ export namespace CustomLogging {
 
     export class ConsoleLogger {
 
-        public readonly prefix: string;
+        public readonly prefix: string | undefined;
         public readonly logLevel: number;
-        public readonly hasPrefix: boolean;
+        public readonly datetimePrefix: boolean;
 
-        constructor(logLevel: LogLevel, prefix?: string) {
-            if (prefix) {
-                this.prefix = prefix;
-                this.hasPrefix = true;
-            } else {
-                this.prefix = "";
-                this.hasPrefix = false;
-            }
+        constructor(logLevel: LogLevel, prefix?: string, datetimePrefix = false) {
+            this.prefix = prefix;
+            this.datetimePrefix = datetimePrefix;
 
             this.logLevel = logLevelNumeric[logLevel];
         }
 
         log(level: LogLevel, message: string, ...parameters: any[]): void {
             if (this.logLevel <= logLevelNumeric[level]) {
-                const fullMessage = this.hasPrefix ? `[${this.prefix}] ${message}` : message;
+                let fullMessage;
+                if (this.prefix) {
+                    fullMessage = this.datetimePrefix ? `[${format(new Date(), 'M/d/yyyy, h:mm:ss a')}] [${this.prefix}] ${message}` : `[${this.prefix}] ${message}`;
+                } else {
+                    fullMessage = this.datetimePrefix ? `[${format(new Date(), 'M/d/yyyy, h:mm:ss a')}] ${message}` : message;
+                }
+
                 console.log(fullMessage, ...parameters);
             }
         }
