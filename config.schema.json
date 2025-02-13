@@ -28,15 +28,16 @@
             },
             "serialNumber": {
               "title": "Serial Number",
+              "description": "If you don't know your device's serial number, use 'device discovery' to find it.",
               "type": "string",
               "required": true
             },
             "ip": {
               "title": "IP Address",
-              "description": "If your device has a static IP address, you can enter it here.",
+              "description": "Please assign a static IP address to your device and enter it here.",
               "type": "string",
               "format": "ipv4",
-              "required": false
+              "required": true
             },
             "controlProtocol": {
               "title": "Control Protocol",

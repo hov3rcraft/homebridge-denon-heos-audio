@@ -1,7 +1,7 @@
-import type { API } from 'homebridge';
+import type { API } from "homebridge";
 
-import { DenonAudioPlatform } from './platform.js';
-import { PLATFORM_NAME } from './settings.js';
+import { DenonAudioPlatform } from "./platform.js";
+import { PLATFORM_NAME } from "./settings.js";
 
 /**
  * This method registers the platform with Homebridge

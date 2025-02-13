@@ -1,12 +1,12 @@
-import type { CharacteristicValue, Logger, PlatformAccessory, Service } from 'homebridge';
+import type { CharacteristicValue, Logger, PlatformAccessory, Service } from "homebridge";
 
-import type { DenonAudioPlatform } from './platform.js';
+import type { DenonAudioPlatform } from "./platform.js";
 
-import { DOMParser } from '@xmldom/xmldom'
-import { PromiseTimeoutException } from './promiseTimeoutException.js';
-import { IDenonClient, RaceStatus } from './denonClient.js';
-import { DenonProtocol } from './denonProtocol.js';
-import { CustomLogging } from './customLogging.js';
+import { DOMParser } from "@xmldom/xmldom";
+import { PromiseTimeoutException } from "./promiseTimeoutException.js";
+import { IDenonClient, RaceStatus } from "./denonClient.js";
+import { DenonProtocol } from "./denonProtocol.js";
+import { CustomLogging } from "./customLogging.js";
 
 /**
  * Platform Accessory
@@ -32,12 +32,12 @@ export class DenonAudioAccessory {
   private readonly protocol: DenonProtocol;
 
   constructor(platform: DenonAudioPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
-    log.debug('Initializing DenonAudioAccessory...');
+    log.debug("Initializing DenonAudioAccessory...");
 
     this.platform = platform;
     this.accessory = accessory;
     this.rawLog = log;
-    this.log = new CustomLogging.LoggerPrefixWrapper(this.rawLog, accessory.displayName)
+    this.log = new CustomLogging.LoggerPrefixWrapper(this.rawLog, accessory.displayName);
 
     this.name = accessory.displayName;
     this.ip = config.ip;
@@ -46,8 +46,7 @@ export class DenonAudioAccessory {
 
     // set accessory information
     this.informationService = this.accessory.getService(this.platform.Service.AccessoryInformation)!;
-    this.informationService.getCharacteristic(this.platform.Characteristic.Identify)
-      .onSet(this.setIdentify.bind(this));
+    this.informationService.getCharacteristic(this.platform.Characteristic.Identify).onSet(this.setIdentify.bind(this));
     this.informationService.setCharacteristic(this.platform.Characteristic.Name, this.name);
     this.informationService.setCharacteristic(this.platform.Characteristic.SerialNumber, this.serialNumber);
     this.informationService.setCharacteristic(this.platform.Characteristic.Manufacturer, "unknown");
@@ -57,10 +56,7 @@ export class DenonAudioAccessory {
 
     // add on/off switch
     this.switchService = this.accessory.getService(`${this.name} Switch`) || this.accessory.addService(this.platform.Service.Switch, `${this.name} Switch`);
-    this.switchService.getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.getOn.bind(this))
-      .onSet(this.setOn.bind(this));
-
+    this.switchService.getCharacteristic(this.platform.Characteristic.On).onGet(this.getOn.bind(this)).onSet(this.setOn.bind(this));
 
     // choose appropriate client
     this.denonClient = new DenonProtocol.CLIENT_MAP[this.protocol](
@@ -72,31 +68,37 @@ export class DenonAudioAccessory {
       this.log.debug.bind(this.log)
     );
 
-    this.log.info('Finished initializing accessory.');
+    this.log.info("Finished initializing accessory.");
   }
 
   private fetchMetadataAios() {
     fetch(`http://${this.ip}:60006/upnp/desc/aios_device/aios_device.xml`)
-      .then(response => {
+      .then((response) => {
         if (!response.ok) {
           this.log.debug(`Received a non-200 status code while connecting to a new device's location href (status code: ${response.status}).`);
         }
 
-        response.text().then(text => {
+        response.text().then((text) => {
           const parser = new DOMParser();
           const xmlDoc = parser.parseFromString(text, "text/xml");
 
-          this.informationService.setCharacteristic(this.platform.Characteristic.Manufacturer, xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("manufacturer")[0]?.textContent || "unknown");
-          this.informationService.setCharacteristic(this.platform.Characteristic.Model, xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("modelName")[0]?.textContent || "unknown");
+          this.informationService.setCharacteristic(
+            this.platform.Characteristic.Manufacturer,
+            xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("manufacturer")[0]?.textContent || "unknown"
+          );
+          this.informationService.setCharacteristic(
+            this.platform.Characteristic.Model,
+            xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("modelName")[0]?.textContent || "unknown"
+          );
 
-          const d_list = (xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("deviceList")[0]?.getElementsByTagName("device") || []);
+          const d_list = xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("deviceList")[0]?.getElementsByTagName("device") || [];
           for (const d of d_list) {
             let firmware_version = d.getElementsByTagName("firmware_version")[0]?.textContent;
             if (firmware_version) {
               this.informationService.setCharacteristic(this.platform.Characteristic.FirmwareRevision, firmware_version || "unknown");
               break;
             }
-          };
+          }
         });
       })
       .catch(() => {
@@ -118,12 +120,12 @@ export class DenonAudioAccessory {
         new Promise<boolean>((resolve, reject) => {
           setTimeout(() => {
             raceStatus.setRaceOver();
-            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT))
+            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT));
           }, DenonAudioAccessory.CALLBACK_TIMEOUT);
-        })
+        }),
       ]);
     } catch (error) {
-      if ((error instanceof PromiseTimeoutException)) {
+      if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getOn(). [race id: ${raceStatus.raceId}]`);
       } else {
         this.log.error(`An error occured while getting power status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
@@ -145,7 +147,7 @@ export class DenonAudioAccessory {
   }
 
   setIdentify(value: any) {
-    this.log.info('Triggered SET Identify:', value);
+    this.log.info("Triggered SET Identify:", value);
   }
 
   /**
