@@ -5,8 +5,8 @@ import type { DenonAudioPlatform } from "./platform.js";
 import { DOMParser } from "@xmldom/xmldom";
 import { PromiseTimeoutException } from "./promiseTimeoutException.js";
 import { IDenonClient, RaceStatus } from "./denonClient.js";
-import { DenonProtocol } from "./denonProtocol.js";
-import { CustomLogging } from "./customLogging.js";
+import * as DenonProtocol from "./denonProtocol.js";
+import * as CustomLogging from "./customLogging.js";
 
 /**
  * Platform Accessory
@@ -29,7 +29,7 @@ export class DenonAudioAccessory {
   private readonly name: string;
   private readonly ip: string;
   private readonly serialNumber: string;
-  private readonly protocol: DenonProtocol;
+  private readonly controlMode: DenonProtocol.ControlMode;
 
   constructor(platform: DenonAudioPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
     log.debug("Initializing DenonAudioAccessory...");
@@ -42,7 +42,7 @@ export class DenonAudioAccessory {
     this.name = accessory.displayName;
     this.ip = config.ip;
     this.serialNumber = config.serialNumber;
-    this.protocol = DenonProtocol[config.controlProtocol as keyof typeof DenonProtocol] as DenonProtocol;
+    this.controlMode = DenonProtocol.ControlMode[config.controlProtocol as keyof typeof DenonProtocol.ControlMode] as DenonProtocol.ControlMode;
 
     // set accessory information
     this.informationService = this.accessory.getService(this.platform.Service.AccessoryInformation)!;
@@ -59,7 +59,7 @@ export class DenonAudioAccessory {
     this.switchService.getCharacteristic(this.platform.Characteristic.On).onGet(this.getOn.bind(this)).onSet(this.setOn.bind(this));
 
     // choose appropriate client
-    this.denonClient = new DenonProtocol.CLIENT_MAP[this.protocol](
+    this.denonClient = new DenonProtocol.CLIENT_MAP[this.controlMode](
       this.serialNumber,
       this.ip,
       DenonAudioAccessory.API_CONNECT_TIMEOUT,
@@ -93,7 +93,7 @@ export class DenonAudioAccessory {
 
           const d_list = xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("deviceList")[0]?.getElementsByTagName("device") || [];
           for (const d of d_list) {
-            let firmware_version = d.getElementsByTagName("firmware_version")[0]?.textContent;
+            const firmware_version = d.getElementsByTagName("firmware_version")[0]?.textContent;
             if (firmware_version) {
               this.informationService.setCharacteristic(this.platform.Characteristic.FirmwareRevision, firmware_version || "unknown");
               break;
@@ -111,7 +111,7 @@ export class DenonAudioAccessory {
    * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
    */
   async getOn(): Promise<CharacteristicValue> {
-    let raceStatus = new RaceStatus();
+    const raceStatus = new RaceStatus();
 
     try {
       this.log.debug(`getPower for ${this.name}. [race id: ${raceStatus.raceId}]`);

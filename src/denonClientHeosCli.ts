@@ -1,5 +1,5 @@
 import { CommandFailedException, CommandMode, DenonClient, InvalidResponseException, RaceStatus } from "./denonClient.js";
-import { DenonProtocol } from "./denonProtocol.js";
+import * as DenonProtocol from "./denonProtocol.js";
 
 enum Playing {
   PLAY,
@@ -7,16 +7,14 @@ enum Playing {
   STOP,
 }
 
-namespace Playing {
-  export const isPlaying: Record<Playing, boolean> = {
-    [Playing.PLAY]: true,
-    [Playing.PAUSE]: false,
-    [Playing.STOP]: false,
-  };
-}
+const isPlaying: Record<Playing, boolean> = {
+  [Playing.PLAY]: true,
+  [Playing.PAUSE]: false,
+  [Playing.STOP]: false,
+};
 
 export class DenonClientHeosCli extends DenonClient {
-  public readonly protocol = DenonProtocol.HEOSCLI;
+  public readonly controlMode = DenonProtocol.ControlMode.HEOSCLI;
 
   protected static readonly PROTOCOL = {
     GLOBAL_CHANGE_EVENT_REGEX: /^event\/(\w+)$/,
@@ -80,7 +78,7 @@ export class DenonClientHeosCli extends DenonClient {
       serialNumber,
       {
         host: host,
-        port: DenonProtocol.HEOSCLI,
+        port: DenonProtocol.ControlMode.HEOSCLI,
         connect_timeout: connect_timeout,
         response_timeout: response_timeout,
         command_prefix: "heos://",
@@ -142,7 +140,7 @@ export class DenonClientHeosCli extends DenonClient {
     let r_obj: any;
     try {
       r_obj = JSON.parse(response);
-    } catch (error) {
+    } catch {
       throw new InvalidResponseException("Received a response that is not valid JSON!", undefined, response);
     }
 
@@ -158,10 +156,10 @@ export class DenonClientHeosCli extends DenonClient {
         throw error;
       }
 
-      let pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
+      const pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
       if (!pid_match || Number(pid_match[1]) === this.player_id) {
         if (this.responseCallback.expectedResponse) {
-          let value_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
+          const value_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
           if (value_match) {
             out = value_match[1];
           }
@@ -203,26 +201,27 @@ export class DenonClientHeosCli extends DenonClient {
     this.debugLog("Received change event:", JSON.stringify(r_obj));
 
     switch (r_obj.heos.command) {
-      case DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EVENT:
+      case DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EVENT: {
         const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EXP_RES);
         if (match && match[1] in DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES && this.powerUpdateCallback) {
           this.powerUpdateCallback(
-            Playing.isPlaying[DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[match[1] as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]
+            isPlaying[DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[match[1] as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]
           );
         } else {
           throw new InvalidResponseException("Unexpected play state", Object.keys(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), r_obj.heos.message);
         }
         break;
+      }
     }
   }
 
   public async getPlaying(): Promise<Playing> {
-    let response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.GET, {});
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.GET, {});
     return DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
   }
 
   public async setPlaying(playing: Playing): Promise<Playing> {
-    let response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.SET, {
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.SET, {
       value: DenonClientHeosCli.REVERSE_PLAY_STATE_VALUES[playing],
     });
     return DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
@@ -231,25 +230,25 @@ export class DenonClientHeosCli extends DenonClient {
   public async getPower(raceStatus?: RaceStatus): Promise<boolean> {
     const playing = await this.getPlaying();
     if (raceStatus && !raceStatus.isRunning() && this.powerUpdateCallback) {
-      this.powerUpdateCallback(Playing.isPlaying[playing]);
+      this.powerUpdateCallback(isPlaying[playing]);
       this.debugLog(`getPower was late to the party [race id: ${raceStatus.raceId}].`);
     }
-    return Playing.isPlaying[playing];
+    return isPlaying[playing];
   }
 
   public async setPower(power: boolean): Promise<boolean> {
     const newPlaying = await this.setPlaying(power ? Playing.PLAY : Playing.STOP);
     if (this.powerUpdateCallback) {
-      this.powerUpdateCallback(Playing.isPlaying[newPlaying]);
+      this.powerUpdateCallback(isPlaying[newPlaying]);
     }
-    return Playing.isPlaying[newPlaying];
+    return isPlaying[newPlaying];
   }
 
   public async getPlay(): Promise<boolean> {
-    return Playing.isPlaying[await this.getPlaying()];
+    return isPlaying[await this.getPlaying()];
   }
 
   public async setPlay(play: boolean): Promise<boolean> {
-    return Playing.isPlaying[await this.setPlaying(play ? Playing.PLAY : Playing.PAUSE)];
+    return isPlaying[await this.setPlaying(play ? Playing.PLAY : Playing.PAUSE)];
   }
 }

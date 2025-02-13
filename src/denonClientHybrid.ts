@@ -1,10 +1,10 @@
-import { IDenonClient, RaceStatus } from "./denonClient.js";
+import { IDenonClient } from "./denonClient.js";
 import { DenonClientAvrControl } from "./denonClientAvrControl.js";
 import { DenonClientHeosCli } from "./denonClientHeosCli.js";
-import { DenonProtocol } from "./denonProtocol.js";
+import * as DenonProtocol from "./denonProtocol.js";
 
 export class DenonClientHybrid implements IDenonClient {
-  public readonly protocol = DenonProtocol.HYBRID;
+  public readonly controlMode = DenonProtocol.ControlMode.HYBRID;
   public readonly serialNumber: string;
 
   private readonly clientAvrControl;
@@ -27,7 +27,7 @@ export class DenonClientHybrid implements IDenonClient {
     return this.clientAvrControl.isConnected() || this.clientHeosCli.isConnected();
   }
 
-  public getPower(raceStatus?: RaceStatus): Promise<boolean> {
+  public getPower(): Promise<boolean> {
     return this.clientAvrControl.getPower();
   }
 

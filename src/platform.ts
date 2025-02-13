@@ -1,10 +1,10 @@
-import type { API, Characteristic, DynamicPlatformPlugin, Logger, LogLevel, PlatformAccessory, PlatformConfig, Service } from "homebridge";
+import type { API, Characteristic, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service } from "homebridge";
 import ssdp, { SSDP } from "@achingbrain/ssdp";
 
 import { DenonAudioAccessory as DenonAudioAccessory } from "./platformAccessory.js";
-import { CustomLogging } from "./customLogging.js";
+import * as CustomLogging from "./customLogging.js";
 import { PLATFORM_NAME, PLUGIN_NAME } from "./settings.js";
-import { DenonProtocol } from "./denonProtocol.js";
+import * as DenonProtocol from "./denonProtocol.js";
 
 export class DenonAudioPlatform implements DynamicPlatformPlugin {
   public readonly rawLog: Logger;
@@ -199,7 +199,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
     this.log.success("Model name:   ", service.details?.device?.modelName);
     this.log.success("Serial number:", serial);
     this.log.success("IP address:   ", service.location.hostname);
-    this.log.success("Supported modes:", supportedModes.map((mode) => DenonProtocol[mode]).join(", "));
+    this.log.success("Supported modes:", supportedModes.map((mode) => DenonProtocol.ControlMode[mode]).join(", "));
     this.log.success("-------------------------------------------------------");
   }
 }

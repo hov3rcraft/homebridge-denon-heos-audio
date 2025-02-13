@@ -136,7 +136,7 @@ export abstract class DenonClient implements IDenonClient {
     commandMode: CommandMode,
     { pid, value, passPayload = false }: { value?: string; pid?: number; passPayload?: boolean }
   ): Promise<string> {
-    let specCommand = command[CommandMode[commandMode]];
+    const specCommand = command[CommandMode[commandMode]];
     let commandStr = specCommand.COMMAND + specCommand.PARAMS;
     if (pid) {
       commandStr = commandStr.replace("[PID]", pid);

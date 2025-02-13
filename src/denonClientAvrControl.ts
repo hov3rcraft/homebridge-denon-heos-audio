@@ -1,8 +1,8 @@
 import { CommandMode, DenonClient, InvalidResponseException } from "./denonClient.js";
-import { DenonProtocol } from "./denonProtocol.js";
+import * as DenonProtocol from "./denonProtocol.js";
 
 export class DenonClientAvrControl extends DenonClient {
-  public readonly protocol = DenonProtocol.AVRCONTROL;
+  public readonly controlMode = DenonProtocol.ControlMode.AVRCONTROL;
 
   protected static readonly PROTOCOL = {
     POWER: {
@@ -39,7 +39,7 @@ export class DenonClientAvrControl extends DenonClient {
       serialNumber,
       {
         host: host,
-        port: DenonProtocol.AVRCONTROL,
+        port: DenonProtocol.ControlMode.AVRCONTROL,
         connect_timeout: connect_timeout,
         response_timeout: response_timeout,
         command_prefix: undefined,
@@ -62,7 +62,7 @@ export class DenonClientAvrControl extends DenonClient {
     if (this.responseCallback) {
       let out: string | undefined = undefined;
       if (this.responseCallback.expectedResponse) {
-        let match = response.match(this.responseCallback.expectedResponse);
+        const match = response.match(this.responseCallback.expectedResponse);
         if (match) {
           out = match[1] ?? match[0];
         }
@@ -87,7 +87,7 @@ export class DenonClientAvrControl extends DenonClient {
     this.debugLog("Received data event:", response);
 
     // Power
-    let match = response.match(DenonClientAvrControl.PROTOCOL.POWER.GET.EXP_RES);
+    const match = response.match(DenonClientAvrControl.PROTOCOL.POWER.GET.EXP_RES);
     if (match) {
       if (match[1] in DenonClientAvrControl.PROTOCOL.POWER.VALUES && this.powerUpdateCallback) {
         this.powerUpdateCallback(DenonClientAvrControl.PROTOCOL.POWER.VALUES[match[1] as keyof typeof DenonClientAvrControl.PROTOCOL.POWER.VALUES]);
@@ -98,12 +98,12 @@ export class DenonClientAvrControl extends DenonClient {
   }
 
   public async getPower(): Promise<boolean> {
-    let response = await this.sendCommand(DenonClientAvrControl.PROTOCOL.POWER, CommandMode.GET, {});
+    const response = await this.sendCommand(DenonClientAvrControl.PROTOCOL.POWER, CommandMode.GET, {});
     return DenonClientAvrControl.PROTOCOL.POWER.VALUES[response as keyof typeof DenonClientAvrControl.PROTOCOL.POWER.VALUES];
   }
 
   public async setPower(power: boolean): Promise<boolean> {
-    let response = await this.sendCommand(DenonClientAvrControl.PROTOCOL.POWER, CommandMode.SET, {
+    const response = await this.sendCommand(DenonClientAvrControl.PROTOCOL.POWER, CommandMode.SET, {
       value: DenonClientAvrControl.REVERSE_POWER_VALUES[Number(power)],
     });
     return DenonClientAvrControl.PROTOCOL.POWER.VALUES[response as keyof typeof DenonClientAvrControl.PROTOCOL.POWER.VALUES];
