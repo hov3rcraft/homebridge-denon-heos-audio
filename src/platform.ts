@@ -1,5 +1,5 @@
 import type { API, Characteristic, DynamicPlatformPlugin, Logger, LogLevel, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
-import ssdp from '@achingbrain/ssdp';
+import ssdp, { SSDP } from '@achingbrain/ssdp';
 
 import { DenonAudioAccessory as DenonAudioAccessory } from './platformAccessory.js';
 import { CustomLogging } from './customLogging.js';
@@ -111,25 +111,37 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
   }
 
   async discoverSsdpDevices() {
-    const bus = await ssdp();
+    let bus: SSDP | undefined = undefined;
+    let discoverIterator = undefined;
     let errorOccurred = false;
 
-    bus.on('error', (error) => {
-      if (!errorOccurred) {
-        this.log.warn("Error in the device discovery service. Shutting it down. New devices will no longer be discovered.");
-        this.log.debug("Error that caused the warning above:", error);
-        errorOccurred = true;
-        bus.stop().catch(() => { });
-      }
-    });
+    try {
+      bus = await ssdp();
 
-    const discoverIterator = bus.discover();
+      bus.on('error', (error) => {
+        if (!errorOccurred) {
+          this.log.warn("Error in the device discovery service. Shutting it down. New devices will no longer be discovered.");
+          this.log.debug("Error that caused the warning above:", error);
+          errorOccurred = true;
+          bus?.stop().catch(() => { });
+        }
+      });
+
+      discoverIterator = bus?.discover();
+    } catch (error) {
+      this.log.warn("Error in the device discovery service. Shutting it down. New devices will no longer be discovered.");
+      this.log.debug("Error that caused the warning above:", error);
+      errorOccurred = true;
+      bus?.stop().catch(() => { });
+    }
+
+
 
     // Loop until an error occurs or the iterator is done
     while (!errorOccurred) {
       let service;
       try {
-        const { value: serviceFound, done } = await discoverIterator.next();
+        const { value: serviceFound, done } = await discoverIterator!.next();
         if (done) break; // End of discovery
         if (errorOccurred) break;
         service = serviceFound;
@@ -139,7 +151,7 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
           this.log.warn("Error in the device discovery service. Shutting it down. New devices will no longer be discovered.");
           this.log.debug("Error that caused the warning above:", error);
           errorOccurred = true;
-          bus.stop().catch(() => { });
+          bus?.stop().catch(() => { });
         }
       }
       await this.checkSsdpDevice(service);
