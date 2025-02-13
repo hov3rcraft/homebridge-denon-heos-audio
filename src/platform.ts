@@ -92,8 +92,8 @@ export class DenonAudioPlatform implements DynamicPlatformPlugin {
           // create the accessory handler for the newly create accessory
           new DenonAudioAccessory(this, accessory, deviceConfig, this.rawLog);
 
-          // link the accessory to your platform
-          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          // publish as external accessory since HomeKit only allows one television accessory per bridge
+          this.api.publishExternalAccessories(PLUGIN_NAME, [accessory]);
         }
       }
     }

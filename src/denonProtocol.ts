@@ -9,7 +9,6 @@ export enum ControlMode {
   AVRCONTROL = 23,
   HEOSCLI = 1255,
   HYBRID = -1,
-  //AUTO = -2
 }
 
 export const CLIENT_MAP: Record<
