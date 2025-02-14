@@ -2,7 +2,7 @@
 
 This plugin controls your Denon smart speakers, stereos, and AVRs. It can use the modern "HeosCLI" protocol, the classic "AVR control" protocol, or a combination of both.
 
-This plugin is especially useful for controlling smart speakers and stereos, which do not support HHTP commands on ports 80 and 8080 and therefore cannot use [homebridge-denon-tv](https://github.com/grzegorz914/homebridge-denon-tv).
+This plugin is especially useful for controlling smart speakers and stereos, which do not support HTTP commands on ports 80 and 8080 and therefore cannot use [homebridge-denon-tv](https://github.com/grzegorz914/homebridge-denon-tv).
 
 ## Pre-Release
 
@@ -24,11 +24,7 @@ I am using the following devices for testing:
 
 ## Roadmap
 
-- v0.2: Play/pause switch using the HeosCLI protocol
 - v0.3: TV service instead of switch
-  - v0.3.1: Volume control and volume limit
-  - v0.3.2: Media states
-  - v0.3.3: Playback control using remote
 - v0.4: Input selection
 
 ### Other planned improvements
