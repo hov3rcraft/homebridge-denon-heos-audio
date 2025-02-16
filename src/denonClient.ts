@@ -18,6 +18,11 @@ export interface IDenonClient {
   isConnected(): boolean;
   getPower(raceStatus?: RaceStatus): Promise<boolean>;
   setPower(power: boolean): Promise<boolean>;
+  getMute(raceStatus?: RaceStatus): Promise<boolean>;
+  setMute(mute: boolean): Promise<boolean>;
+  getVolume(raceStatus?: RaceStatus): void;
+  setVolume(volume: number): Promise<number>;
+  setVolumeRelative(direction: boolean): Promise<number>;
 }
 
 export abstract class DenonClient implements IDenonClient {
@@ -29,14 +34,18 @@ export abstract class DenonClient implements IDenonClient {
   private pendingData: string;
   protected responseCallback: ResponseCallback | undefined;
 
-  protected powerUpdateCallback;
   protected debugLogCallback;
+  protected powerUpdateCallback;
+  protected muteUpdateCallback;
+  protected volumeUpdateCallback;
 
   constructor(
     serialNumber: string,
     params: IDenonClientConnectionParams,
+    debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
-    debugLogCallback?: (message: string, ...parameters: any[]) => void
+    muteUpdateCallback?: (mute: boolean) => void,
+    volumeUpdateCallback?: (volume: number) => void
   ) {
     this.serialNumber = serialNumber;
     this.params = params;
@@ -47,8 +56,10 @@ export abstract class DenonClient implements IDenonClient {
     this.pendingData = "";
     this.responseCallback = undefined;
 
-    this.powerUpdateCallback = powerUpdateCallback;
     this.debugLogCallback = debugLogCallback;
+    this.powerUpdateCallback = powerUpdateCallback;
+    this.muteUpdateCallback = muteUpdateCallback;
+    this.volumeUpdateCallback = volumeUpdateCallback;
   }
 
   protected async connect(): Promise<void> {
@@ -147,11 +158,19 @@ export abstract class DenonClient implements IDenonClient {
 
     if (specCommand.EXP_RES) {
       const response = await this.send(commandStr, specCommand.COMMAND, specCommand.EXP_RES, passPayload);
-      if (command.VALUES && !(response in command.VALUES)) {
-        throw new InvalidResponseException(`Unexpected response for command ${commandStr}`, command.VALUES, response);
-      } else {
-        return response;
+
+      if (command.VALUES) {
+        const mappedValue = findMapByValue(command.VALUES, response);
+
+        if (mappedValue === undefined) {
+          throw new InvalidResponseException(
+            `Unexpected response for command ${commandStr}`,
+            Object.values(command.VALUES).map((value: any) => value.VALUE),
+            response
+          );
+        }
       }
+      return response;
     } else {
       return await this.send(commandStr, specCommand.COMMAND, undefined, passPayload);
     }
@@ -220,6 +239,16 @@ export abstract class DenonClient implements IDenonClient {
   public abstract getPower(raceStatus?: RaceStatus): Promise<boolean>;
 
   public abstract setPower(power: boolean): Promise<boolean>;
+
+  public abstract getMute(raceStatus?: RaceStatus): Promise<boolean>;
+
+  public abstract setMute(mute: boolean): Promise<boolean>;
+
+  public abstract getVolume(raceStatus?: RaceStatus): Promise<number>;
+
+  public abstract setVolume(volume: number): Promise<number>;
+
+  public abstract setVolumeRelative(direction: boolean): Promise<number>;
 }
 
 export enum CommandMode {
@@ -314,4 +343,24 @@ export class InvalidResponseException extends Error {
     }
     return fullMessage;
   }
+}
+
+export function findMapByValue(values: any, mapValue: any) {
+  for (const key in values) {
+    if (values[key].VALUE === mapValue) {
+      return values[key].MAP;
+    }
+  }
+
+  return undefined;
+}
+
+export function findValueByMap(values: any, mapValue: any) {
+  for (const key in values) {
+    if (values[key].MAP === mapValue) {
+      return values[key].VALUE;
+    }
+  }
+
+  return undefined;
 }

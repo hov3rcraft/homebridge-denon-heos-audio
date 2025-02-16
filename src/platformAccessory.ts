@@ -31,6 +31,9 @@ export class DenonAudioAccessory {
   private readonly ip: string;
   private readonly serialNumber: string;
   private readonly controlMode: DenonProtocol.ControlMode;
+  private readonly volumeLimit: number | undefined;
+
+  private lastSetVolume: number | undefined;
 
   constructor(platform: DenonAudioPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
     log.debug("Initializing DenonAudioAccessory...");
@@ -44,6 +47,11 @@ export class DenonAudioAccessory {
     this.ip = config.ip;
     this.serialNumber = config.serialNumber;
     this.controlMode = DenonProtocol.ControlMode[config.controlProtocol as keyof typeof DenonProtocol.ControlMode] as DenonProtocol.ControlMode;
+
+    if (config.volumeLimitEnabled && (config.volumeLimit < 0 || config.volumeLimit > 99)) {
+      throw new Error("Volume limit must be between 0 and 99");
+    }
+    this.volumeLimit = config.volumeLimitEnabled ? config.volumeLimit : undefined;
 
     // set accessory category
     accessory.category = this.platform.api.hap.Categories.TELEVISION;
@@ -81,6 +89,7 @@ export class DenonAudioAccessory {
       this.accessory.getService(`${this.name} Speaker`) || this.accessory.addService(this.platform.Service.TelevisionSpeaker, `${this.name} Speaker`);
     this.speakerService.getCharacteristic(this.platform.Characteristic.Mute).onGet(this.getMute.bind(this)).onSet(this.setMute.bind(this));
     this.speakerService.getCharacteristic(this.platform.Characteristic.Volume).onGet(this.getVolume.bind(this)).onSet(this.setVolume.bind(this));
+    this.speakerService.getCharacteristic(this.platform.Characteristic.VolumeSelector).onSet(this.setVolumeSelector.bind(this));
     this.speakerService.setCharacteristic(this.platform.Characteristic.VolumeControlType, this.platform.Characteristic.VolumeControlType.ABSOLUTE);
 
     // choose appropriate client
@@ -89,8 +98,10 @@ export class DenonAudioAccessory {
       this.ip,
       DenonAudioAccessory.API_CONNECT_TIMEOUT,
       DenonAudioAccessory.API_RESPONSE_TIMEOUT,
+      this.log.debug.bind(this.log),
       this.callbackActive.bind(this),
-      this.log.debug.bind(this.log)
+      this.callbackMute.bind(this),
+      this.callbackVolume.bind(this)
     );
 
     this.log.info("Finished initializing accessory.");
@@ -137,9 +148,9 @@ export class DenonAudioAccessory {
    */
   async getActive(): Promise<CharacteristicValue> {
     const raceStatus = new RaceStatus();
+    this.log.debug(`getPower for ${this.name}. [race id: ${raceStatus.raceId}]`);
 
     try {
-      this.log.debug(`getPower for ${this.name}. [race id: ${raceStatus.raceId}]`);
       return await Promise.race([
         this.denonClient.getPower(raceStatus),
         new Promise<boolean>((resolve, reject) => {
@@ -175,16 +186,55 @@ export class DenonAudioAccessory {
   }
 
   async getMute(): Promise<CharacteristicValue> {
-    // TODO
-    return false;
+    const raceStatus = new RaceStatus();
+    this.log.debug(`getMute for ${this.name}. [race id: ${raceStatus.raceId}]`);
+
+    try {
+      return await Promise.race([
+        this.denonClient.getMute(raceStatus),
+        new Promise<boolean>((resolve, reject) => {
+          setTimeout(() => {
+            raceStatus.setRaceOver();
+            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT));
+          }, DenonAudioAccessory.CALLBACK_TIMEOUT);
+        }),
+      ]);
+    } catch (error) {
+      if (error instanceof PromiseTimeoutException) {
+        this.log.debug(`${this.name} lost its promise race for getMute(). [race id: ${raceStatus.raceId}]`);
+      } else {
+        this.log.error(`An error occured while getting mute status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
+      }
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
   async getVolume(): Promise<CharacteristicValue> {
-    // TODO
-    return 50;
+    const raceStatus = new RaceStatus();
+    this.log.debug(`getVolume for ${this.name}. [race id: ${raceStatus.raceId}]`);
+
+    try {
+      const volume = await Promise.race([
+        this.denonClient.getVolume(raceStatus),
+        new Promise<number>((resolve, reject) => {
+          setTimeout(() => {
+            raceStatus.setRaceOver();
+            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT));
+          }, DenonAudioAccessory.CALLBACK_TIMEOUT);
+        }),
+      ]);
+      return this.adjustBackFromVolumeLimit(volume as number);
+    } catch (error) {
+      if (error instanceof PromiseTimeoutException) {
+        this.log.debug(`${this.name} lost its promise race for getVolume(). [race id: ${raceStatus.raceId}]`);
+      } else {
+        this.log.error(`An error occured while getting volume for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
+      }
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
-  /**
+  /*
    * Handle "SET" requests from HomeKit
    * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
    */
@@ -209,54 +259,67 @@ export class DenonAudioAccessory {
     switch (remoteKey) {
       case this.platform.Characteristic.RemoteKey.REWIND: {
         this.log.info("set Remote Key Pressed: REWIND");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.FAST_FORWARD: {
         this.log.info("set Remote Key Pressed: FAST_FORWARD");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.NEXT_TRACK: {
         this.log.info("set Remote Key Pressed: NEXT_TRACK");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK: {
         this.log.info("set Remote Key Pressed: PREVIOUS_TRACK");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_UP: {
         this.log.info("set Remote Key Pressed: ARROW_UP");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_DOWN: {
         this.log.info("set Remote Key Pressed: ARROW_DOWN");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_LEFT: {
         this.log.info("set Remote Key Pressed: ARROW_LEFT");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_RIGHT: {
         this.log.info("set Remote Key Pressed: ARROW_RIGHT");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.SELECT: {
         this.log.info("set Remote Key Pressed: SELECT");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.BACK: {
         this.log.info("set Remote Key Pressed: BACK");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.EXIT: {
         this.log.info("set Remote Key Pressed: EXIT");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.PLAY_PAUSE: {
         this.log.info("set Remote Key Pressed: PLAY_PAUSE");
+        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.INFORMATION: {
         this.log.info("set Remote Key Pressed: INFORMATION");
+        // TODO
         break;
       }
     }
@@ -269,18 +332,68 @@ export class DenonAudioAccessory {
 
   setMute(newValue: CharacteristicValue) {
     this.log.debug(`setMute for ${this.name} set to ${newValue}`);
-    // TODO
+    this.denonClient.setMute(newValue as boolean).catch((error) => {
+      this.log.error(`An error occured while setting mute status for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    });
   }
 
   setVolume(newValue: CharacteristicValue) {
     this.log.debug(`setVolume for ${this.name} set to ${newValue}`);
-    // TODO
+    this.lastSetVolume = newValue as number;
+    const volumetoSet = this.adjustToVolumeLimit(newValue as number);
+
+    this.denonClient.setVolume(volumetoSet).catch((error) => {
+      this.log.error(`An error occured while setting volume for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    });
   }
 
-  /**
+  setVolumeSelector(direction: CharacteristicValue) {
+    if (direction === this.platform.Characteristic.VolumeSelector.INCREMENT) {
+      this.log.info("volume INCREMENT pressed");
+      // TODO
+    } else if (direction === this.platform.Characteristic.VolumeSelector.DECREMENT) {
+      this.log.info("volume DECREMENT pressed");
+      // TODO
+    }
+  }
+
+  /*
    * Handles characteristic updates from the API
    */
-  private callbackActive(state: CharacteristicValue) {
-    this.tvService.updateCharacteristic(this.platform.Characteristic.Active, state);
+  private callbackActive(active: boolean) {
+    this.tvService.updateCharacteristic(this.platform.Characteristic.Active, active);
+  }
+
+  private callbackMute(mute: boolean) {
+    this.speakerService.updateCharacteristic(this.platform.Characteristic.Mute, mute);
+  }
+
+  private callbackVolume(volume: number) {
+    this.speakerService.updateCharacteristic(this.platform.Characteristic.Volume, this.adjustBackFromVolumeLimit(volume));
+  }
+
+  /*
+   * Volume Limit Helpers
+   */
+  private adjustToVolumeLimit(volume: number) {
+    if (this.volumeLimit) {
+      return Math.round((volume * this.volumeLimit) / 100);
+    } else {
+      return volume;
+    }
+  }
+
+  private adjustBackFromVolumeLimit(volume: number) {
+    if (this.volumeLimit) {
+      if (this.lastSetVolume && this.adjustToVolumeLimit(this.lastSetVolume) === volume) {
+        return this.lastSetVolume;
+      } else {
+        return Math.round((volume / this.volumeLimit) * 100);
+      }
+    } else {
+      return volume;
+    }
   }
 }

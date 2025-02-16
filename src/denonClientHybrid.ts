@@ -1,4 +1,4 @@
-import { IDenonClient } from "./denonClient.js";
+import { IDenonClient, RaceStatus } from "./denonClient.js";
 import { DenonClientAvrControl } from "./denonClientAvrControl.js";
 import { DenonClientHeosCli } from "./denonClientHeosCli.js";
 import * as DenonProtocol from "./denonProtocol.js";
@@ -15,11 +15,31 @@ export class DenonClientHybrid implements IDenonClient {
     host: string,
     connect_timeout: number,
     response_timeout: number,
+    debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
-    debugLogCallback?: (message: string, ...parameters: any[]) => void
+    muteUpdateCallback?: (mute: boolean) => void,
+    volumeUpdateCallback?: (volume: number) => void
   ) {
-    this.clientAvrControl = new DenonClientAvrControl(serialNumber, host, connect_timeout, response_timeout, powerUpdateCallback, debugLogCallback);
-    this.clientHeosCli = new DenonClientHeosCli(serialNumber, host, connect_timeout, response_timeout, powerUpdateCallback, debugLogCallback);
+    this.clientAvrControl = new DenonClientAvrControl(
+      serialNumber,
+      host,
+      connect_timeout,
+      response_timeout,
+      debugLogCallback,
+      powerUpdateCallback,
+      muteUpdateCallback,
+      volumeUpdateCallback
+    );
+    this.clientHeosCli = new DenonClientHeosCli(
+      serialNumber,
+      host,
+      connect_timeout,
+      response_timeout,
+      debugLogCallback,
+      powerUpdateCallback,
+      muteUpdateCallback,
+      volumeUpdateCallback
+    );
     this.serialNumber = serialNumber;
   }
 
@@ -33,5 +53,25 @@ export class DenonClientHybrid implements IDenonClient {
 
   public setPower(power: boolean): Promise<boolean> {
     return this.clientAvrControl.setPower(power);
+  }
+
+  public getMute(raceStatus?: RaceStatus): Promise<boolean> {
+    return this.clientHeosCli.getMute(raceStatus);
+  }
+
+  public setMute(mute: boolean): Promise<boolean> {
+    return this.clientHeosCli.setMute(mute);
+  }
+
+  public getVolume(raceStatus?: RaceStatus): Promise<number> {
+    return this.clientHeosCli.getVolume(raceStatus);
+  }
+
+  public setVolume(volume: number): Promise<number> {
+    return this.clientHeosCli.setVolume(volume);
+  }
+
+  public setVolumeRelative(direction: boolean): Promise<number> {
+    return this.clientHeosCli.setVolumeRelative(direction);
   }
 }

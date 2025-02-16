@@ -1,4 +1,4 @@
-import { CommandFailedException, CommandMode, DenonClient, InvalidResponseException, RaceStatus } from "./denonClient.js";
+import { CommandFailedException, CommandMode, DenonClient, findMapByValue, findValueByMap, InvalidResponseException, RaceStatus } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 
 enum Playing {
@@ -26,8 +26,14 @@ export class DenonClientHeosCli extends DenonClient {
         EXP_RES: /enable=(\w+)/,
       },
       VALUES: {
-        on: true,
-        off: false,
+        ON: {
+          VALUE: "on",
+          MAP: true,
+        },
+        OFF: {
+          VALUE: "off",
+          MAP: false,
+        },
       },
     },
     PLAYERS: {
@@ -40,7 +46,6 @@ export class DenonClientHeosCli extends DenonClient {
       GET: {
         COMMAND: "player/get_play_state",
         PARAMS: "?pid=[PID]",
-        EVENT: "event/player_state_changed",
         EXP_RES: /state=(\w+)/,
       },
       SET: {
@@ -48,21 +53,68 @@ export class DenonClientHeosCli extends DenonClient {
         PARAMS: "?pid=[PID]&state=[VALUE]",
         EXP_RES: /state=(\w+)/,
       },
+      EVENT: {
+        COMMAND: "event/player_state_changed",
+        EXP_RES: /state=(\w+)/,
+      },
       VALUES: {
-        play: Playing.PLAY,
-        pause: Playing.PAUSE,
-        stop: Playing.STOP,
+        PLAY: {
+          VALUE: "play",
+          MAP: Playing.PLAY,
+        },
+        PAUSE: {
+          VALUE: "pause",
+          MAP: Playing.PAUSE,
+        },
+        STOP: {
+          VALUE: "stop",
+          MAP: Playing.STOP,
+        },
+      },
+    },
+    MUTE: {
+      GET: {
+        COMMAND: "player/get_mute",
+        PARAMS: "?pid=[PID]",
+        EXP_RES: /state=(\w+)/,
+      },
+      SET: {
+        COMMAND: "player/set_mute",
+        PARAMS: "?pid=[PID]&state=[VALUE]",
+        EXP_RES: /state=(\w+)/,
+      },
+      EVENT: {
+        EVENT: "event/player_volume_changed",
+        EXP_RES: /mute=(\w+)/,
+      },
+      VALUES: {
+        ON: {
+          VALUE: "on",
+          MAP: true,
+        },
+        OFF: {
+          VALUE: "off",
+          MAP: false,
+        },
+      },
+    },
+    VOLUME: {
+      GET: {
+        COMMAND: "player/get_volume",
+        PARAMS: "?pid=[PID]",
+        EXP_RES: /level=(\d+)/,
+      },
+      SET: {
+        COMMAND: "player/set_volume",
+        PARAMS: "?pid=[PID]&level=[VALUE]",
+        EXP_RES: /level=(\d+)/,
+      },
+      EVENT: {
+        EVENT: "event/player_volume_changed",
+        EXP_RES: /level=(\d+)/,
       },
     },
   };
-
-  protected static readonly REVERSE_PLAY_STATE_VALUES = Object.fromEntries(
-    Object.entries(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES).map(([key, value]) => [value, key])
-  ) as Record<Playing, string>;
-
-  protected static readonly REVERSE_EVENT_SUB_VALUES = Object.fromEntries(
-    Object.entries(DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES).map(([key, value]) => [Number(value), key])
-  ) as Record<number, string>;
 
   private player_id: number | undefined;
 
@@ -71,8 +123,10 @@ export class DenonClientHeosCli extends DenonClient {
     host: string,
     connect_timeout: number,
     response_timeout: number,
+    debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
-    debugLogCallback?: (message: string, ...parameters: any[]) => void
+    muteUpdateCallback?: (mute: boolean) => void,
+    volumeUpdateCallback?: (volume: number) => void
   ) {
     super(
       serialNumber,
@@ -86,8 +140,10 @@ export class DenonClientHeosCli extends DenonClient {
         response_separator: "\r\n",
         all_responses_to_generic: false,
       },
+      debugLogCallback,
       powerUpdateCallback,
-      debugLogCallback
+      muteUpdateCallback,
+      volumeUpdateCallback
     );
 
     this.player_id = undefined;
@@ -112,15 +168,20 @@ export class DenonClientHeosCli extends DenonClient {
   protected async subscribeToChangeEvents(): Promise<void> {
     const commandStr = (DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND + DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.PARAMS).replace(
       "[VALUE]",
-      DenonClientHeosCli.REVERSE_EVENT_SUB_VALUES[Number(true)]
+      DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES.ON.VALUE
     );
     const response = await this.sendUnchecked(commandStr, DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND, DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.EXP_RES);
+    const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES, response);
 
-    if (!(response in DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES)) {
-      throw new InvalidResponseException("No valid response!", Object.keys(DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES), response);
+    if (mappedValue === undefined) {
+      throw new InvalidResponseException(
+        "No valid response!",
+        Object.values(DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES).map((value) => value.VALUE),
+        response
+      );
     }
 
-    if (response !== DenonClientHeosCli.REVERSE_EVENT_SUB_VALUES[Number(true)]) {
+    if (response !== DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES.ON.VALUE) {
       throw new CommandFailedException(commandStr);
     }
   }
@@ -200,31 +261,45 @@ export class DenonClientHeosCli extends DenonClient {
 
     this.debugLog("Received change event:", JSON.stringify(r_obj));
 
-    switch (r_obj.heos.command) {
-      case DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EVENT: {
-        const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PLAY_STATE.GET.EXP_RES);
-        if (match && match[1] in DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES && this.powerUpdateCallback) {
-          this.powerUpdateCallback(
-            isPlaying[DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[match[1] as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES]]
-          );
-        } else {
-          throw new InvalidResponseException("Unexpected play state", Object.keys(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES), r_obj.heos.message);
-        }
-        break;
+    // Play state
+    if (r_obj.heos.command === DenonClientHeosCli.PROTOCOL.PLAY_STATE.EVENT.COMMAND) {
+      const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PLAY_STATE.EVENT.EXP_RES);
+
+      if (!match) {
+        throw new InvalidResponseException(
+          "Unexpected play state",
+          Object.values(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES).map((value) => value.VALUE),
+          r_obj.heos.message
+        );
+      }
+
+      const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES, match[1]);
+      if (mappedValue === undefined) {
+        throw new InvalidResponseException(
+          "Unexpected play state",
+          Object.values(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES).map((value) => value.VALUE),
+          r_obj.heos.message
+        );
+      }
+
+      if (this.powerUpdateCallback) {
+        this.powerUpdateCallback(mappedValue);
       }
     }
   }
 
   public async getPlaying(): Promise<Playing> {
     const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.GET, {});
-    return DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
+    const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES, response);
+    return mappedValue;
   }
 
   public async setPlaying(playing: Playing): Promise<Playing> {
     const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.SET, {
-      value: DenonClientHeosCli.REVERSE_PLAY_STATE_VALUES[playing],
+      value: findValueByMap(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES, playing),
     });
-    return DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES[response as keyof typeof DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES];
+    const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES, response);
+    return mappedValue;
   }
 
   public async getPower(raceStatus?: RaceStatus): Promise<boolean> {
@@ -250,5 +325,58 @@ export class DenonClientHeosCli extends DenonClient {
 
   public async setPlay(play: boolean): Promise<boolean> {
     return isPlaying[await this.setPlaying(play ? Playing.PLAY : Playing.PAUSE)];
+  }
+
+  public async getMute(raceStatus?: RaceStatus): Promise<boolean> {
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.MUTE, CommandMode.GET, {});
+    const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.MUTE.VALUES, response);
+    if (raceStatus && !raceStatus.isRunning() && this.muteUpdateCallback) {
+      this.muteUpdateCallback(mappedValue);
+      this.debugLog(`getMute was late to the party [race id: ${raceStatus.raceId}].`);
+    }
+    return mappedValue;
+  }
+
+  public async setMute(mute: boolean): Promise<boolean> {
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.MUTE, CommandMode.SET, {
+      value: findValueByMap(DenonClientHeosCli.PROTOCOL.MUTE.VALUES, mute),
+    });
+
+    const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.MUTE.VALUES, response);
+    if (this.muteUpdateCallback) {
+      this.muteUpdateCallback(mappedValue);
+    }
+
+    return mappedValue;
+  }
+
+  public async getVolume(raceStatus?: RaceStatus): Promise<number> {
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.VOLUME, CommandMode.GET, {});
+    if (raceStatus && !raceStatus.isRunning() && this.volumeUpdateCallback) {
+      this.volumeUpdateCallback(Number(response));
+      this.debugLog(`getVolume was late to the party [race id: ${raceStatus.raceId}].`);
+    }
+    return Number(response);
+  }
+
+  public async setVolume(volume: number): Promise<number> {
+    if (volume < 0 || volume > 100) {
+      throw new Error("Volume must be between 0 and 100");
+    }
+
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.VOLUME, CommandMode.SET, {
+      value: Math.round(volume).toString(),
+    });
+
+    if (this.volumeUpdateCallback) {
+      this.volumeUpdateCallback(Number(response));
+    }
+
+    return Number(response);
+  }
+
+  public async setVolumeRelative(direction: boolean): Promise<number> {
+    // TODO
+    return -1;
   }
 }

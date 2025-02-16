@@ -70,8 +70,8 @@
               "type": "integer",
               "required": false,
               "minimum": 0,
-              "maximum": 100,
-              "default": 100
+              "maximum": 99,
+              "default": 99
             }
           }
         }
@@ -87,13 +87,7 @@
         "title": "Log Level",
         "description": "If console log is enabled, only log messages at this log level or below it will be displayed in the console.",
         "type": "string",
-        "enum": [
-          "error",
-          "warn",
-          "success",
-          "info",
-          "debug"
-        ],
+        "enum": ["error", "warn", "success", "info", "debug"],
         "required": false,
         "default": "debug"
       }

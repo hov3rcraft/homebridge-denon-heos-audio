@@ -18,8 +18,10 @@ export const CLIENT_MAP: Record<
     host: string,
     connect_timeout: number,
     response_timeout: number,
+    debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
-    debugLogCallback?: (message: string, ...parameters: any[]) => void
+    muteUpdateCallback?: (mute: boolean) => void,
+    volumeUpdateCallback?: (volume: number) => void
   ) => IDenonClient
 > = {
   [ControlMode.AVRCONTROL]: DenonClientAvrControl,
