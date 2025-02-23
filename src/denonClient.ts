@@ -18,6 +18,10 @@ export interface IDenonClient {
   isConnected(): boolean;
   getPower(raceStatus?: RaceStatus): Promise<boolean>;
   setPower(power: boolean): Promise<boolean>;
+  getPlaying(raceStatus?: RaceStatus): Promise<Playing>;
+  setPlaying(playing: Playing): Promise<Playing>;
+  setPlayNext(): Promise<void>;
+  setPlayPrevious(): Promise<void>;
   getMute(raceStatus?: RaceStatus): Promise<boolean>;
   setMute(mute: boolean): Promise<boolean>;
   getVolume(raceStatus?: RaceStatus): Promise<number>;
@@ -248,6 +252,14 @@ export abstract class DenonClient implements IDenonClient {
 
   public abstract setPower(power: boolean): Promise<boolean>;
 
+  public abstract getPlaying(raceStatus?: RaceStatus): Promise<Playing>;
+
+  public abstract setPlaying(playing: Playing): Promise<Playing>;
+
+  public abstract setPlayNext(): Promise<void>;
+
+  public abstract setPlayPrevious(): Promise<void>;
+
   public abstract getMute(raceStatus?: RaceStatus): Promise<boolean>;
 
   public abstract setMute(mute: boolean): Promise<boolean>;
@@ -293,6 +305,40 @@ export class RaceStatus {
   public setRaceOver() {
     this.running = false;
   }
+}
+
+export enum Playing {
+  PLAY,
+  PAUSE,
+  STOP,
+  UNSUPPORTED,
+}
+
+export const isPlaying: Record<Playing, boolean> = {
+  [Playing.PLAY]: true,
+  [Playing.PAUSE]: false,
+  [Playing.STOP]: false,
+  [Playing.UNSUPPORTED]: false,
+};
+
+export function findMapByValue(values: any, mapValue: any) {
+  for (const key in values) {
+    if (values[key].VALUE === mapValue) {
+      return values[key].MAP;
+    }
+  }
+
+  return undefined;
+}
+
+export function findValueByMap(values: any, mapValue: any) {
+  for (const key in values) {
+    if (values[key].MAP === mapValue) {
+      return values[key].VALUE;
+    }
+  }
+
+  return undefined;
 }
 
 export class ConnectionTimeoutException extends Error {
@@ -353,24 +399,4 @@ export class InvalidResponseException extends Error {
     }
     return fullMessage;
   }
-}
-
-export function findMapByValue(values: any, mapValue: any) {
-  for (const key in values) {
-    if (values[key].VALUE === mapValue) {
-      return values[key].MAP;
-    }
-  }
-
-  return undefined;
-}
-
-export function findValueByMap(values: any, mapValue: any) {
-  for (const key in values) {
-    if (values[key].MAP === mapValue) {
-      return values[key].VALUE;
-    }
-  }
-
-  return undefined;
 }

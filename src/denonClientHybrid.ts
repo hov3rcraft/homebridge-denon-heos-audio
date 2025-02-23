@@ -1,4 +1,4 @@
-import { IDenonClient, RaceStatus } from "./denonClient.js";
+import { IDenonClient, Playing, RaceStatus } from "./denonClient.js";
 import { DenonClientAvrControl } from "./denonClientAvrControl.js";
 import { DenonClientHeosCli } from "./denonClientHeosCli.js";
 import * as DenonProtocol from "./denonProtocol.js";
@@ -53,6 +53,22 @@ export class DenonClientHybrid implements IDenonClient {
 
   public setPower(power: boolean): Promise<boolean> {
     return this.clientAvrControl.setPower(power);
+  }
+
+  public getPlaying(raceStatus: RaceStatus): Promise<Playing> {
+    return this.clientHeosCli.getPlaying(raceStatus);
+  }
+
+  public setPlaying(playing: Playing): Promise<Playing> {
+    return this.clientHeosCli.setPlaying(playing);
+  }
+
+  public async setPlayNext(): Promise<void> {
+    return this.clientHeosCli.setPlayNext();
+  }
+
+  public async setPlayPrevious(): Promise<void> {
+    return this.clientHeosCli.setPlayPrevious();
   }
 
   public getMute(raceStatus?: RaceStatus): Promise<boolean> {

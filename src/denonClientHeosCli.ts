@@ -1,17 +1,15 @@
-import { CommandFailedException, CommandMode, DenonClient, findMapByValue, findValueByMap, InvalidResponseException, RaceStatus } from "./denonClient.js";
+import {
+  CommandFailedException,
+  CommandMode,
+  DenonClient,
+  findMapByValue,
+  findValueByMap,
+  InvalidResponseException,
+  isPlaying,
+  Playing,
+  RaceStatus,
+} from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
-
-enum Playing {
-  PLAY,
-  PAUSE,
-  STOP,
-}
-
-const isPlaying: Record<Playing, boolean> = {
-  [Playing.PLAY]: true,
-  [Playing.PAUSE]: false,
-  [Playing.STOP]: false,
-};
 
 export class DenonClientHeosCli extends DenonClient {
   public readonly controlMode = DenonProtocol.ControlMode.HEOSCLI;
@@ -71,6 +69,20 @@ export class DenonClientHeosCli extends DenonClient {
           VALUE: "stop",
           MAP: Playing.STOP,
         },
+      },
+    },
+    PLAY_NEXT: {
+      SET: {
+        COMMAND: "player/play_next",
+        PARAMS: "?pid=[PID]",
+        EXP_RES: /.*/,
+      },
+    },
+    PLAY_PREVIOUS: {
+      SET: {
+        COMMAND: "player/play_previous",
+        PARAMS: "?pid=[PID]",
+        EXP_RES: /.*/,
       },
     },
     MUTE: {
@@ -301,10 +313,18 @@ export class DenonClientHeosCli extends DenonClient {
     }
   }
 
-  public async getPlaying(): Promise<Playing> {
+  private async getPlayingInternal(): Promise<Playing> {
     const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_STATE, CommandMode.GET, {});
     const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES, response);
     return mappedValue;
+  }
+
+  public async getPlaying(raceStatus?: RaceStatus): Promise<Playing> {
+    const playing = await this.getPlayingInternal();
+    if (raceStatus && !raceStatus.isRunning()) {
+      this.debugLog(`getPlaying was late to the party [race id: ${raceStatus.raceId}].`);
+    }
+    return playing;
   }
 
   public async setPlaying(playing: Playing): Promise<Playing> {
@@ -315,8 +335,16 @@ export class DenonClientHeosCli extends DenonClient {
     return mappedValue;
   }
 
+  public async setPlayNext(): Promise<void> {
+    await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_NEXT, CommandMode.SET, {});
+  }
+
+  public async setPlayPrevious(): Promise<void> {
+    await this.sendCommand(DenonClientHeosCli.PROTOCOL.PLAY_PREVIOUS, CommandMode.SET, {});
+  }
+
   public async getPower(raceStatus?: RaceStatus): Promise<boolean> {
-    const playing = await this.getPlaying();
+    const playing = await this.getPlayingInternal();
     if (raceStatus && !raceStatus.isRunning() && this.powerUpdateCallback) {
       this.powerUpdateCallback(isPlaying[playing]);
       this.debugLog(`getPower was late to the party [race id: ${raceStatus.raceId}].`);
@@ -330,14 +358,6 @@ export class DenonClientHeosCli extends DenonClient {
       this.powerUpdateCallback(isPlaying[newPlaying]);
     }
     return isPlaying[newPlaying];
-  }
-
-  public async getPlay(): Promise<boolean> {
-    return isPlaying[await this.getPlaying()];
-  }
-
-  public async setPlay(play: boolean): Promise<boolean> {
-    return isPlaying[await this.setPlaying(play ? Playing.PLAY : Playing.PAUSE)];
   }
 
   public async getMute(raceStatus?: RaceStatus): Promise<boolean> {

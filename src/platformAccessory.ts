@@ -4,7 +4,7 @@ import type { DenonAudioPlatform } from "./platform.js";
 
 import { DOMParser } from "@xmldom/xmldom";
 import { PromiseTimeoutException } from "./promiseTimeoutException.js";
-import { IDenonClient, RaceStatus } from "./denonClient.js";
+import { IDenonClient, Playing, RaceStatus } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 import * as CustomLogging from "./customLogging.js";
 
@@ -35,8 +35,10 @@ export class DenonAudioAccessory {
   private readonly volumeLimit: number | undefined;
 
   private lastSetVolume: number | undefined;
+  private targetMediaState: CharacteristicValue | undefined;
 
   private volumeChangeOngoing = false;
+  private playingChangeOngoing = false;
 
   constructor(platform: DenonAudioPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
     log.debug("Initializing DenonAudioAccessory...");
@@ -183,14 +185,60 @@ export class DenonAudioAccessory {
     return 1;
   }
 
+  private async getPlaying(raceStatus: RaceStatus): Promise<Playing> {
+    try {
+      return await Promise.race([
+        this.denonClient.getPlaying(raceStatus),
+        new Promise<Playing>((resolve, reject) => {
+          setTimeout(() => {
+            raceStatus.setRaceOver();
+            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT));
+          }, DenonAudioAccessory.CALLBACK_TIMEOUT);
+        }),
+      ]);
+    } catch (error) {
+      if (error instanceof PromiseTimeoutException) {
+        this.log.debug(`${this.name} lost its promise race for getPlaying(). [race id: ${raceStatus.raceId}]`);
+      } else {
+        this.log.error(`An error occured while getting playing status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
+      }
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
+  }
+
   async getCurrentMediaState(): Promise<CharacteristicValue> {
-    // TODO
-    return this.platform.Characteristic.CurrentMediaState.PLAY;
+    const raceStatus = new RaceStatus();
+    this.log.debug(`getCurrentMediaState for ${this.name}. [race id: ${raceStatus.raceId}]`);
+    const playing = await this.getPlaying(raceStatus);
+    switch (playing) {
+      case Playing.PLAY:
+        return this.platform.Characteristic.CurrentMediaState.PLAY;
+      case Playing.PAUSE:
+        return this.platform.Characteristic.CurrentMediaState.PAUSE;
+      case Playing.STOP:
+      case Playing.UNSUPPORTED:
+        return this.platform.Characteristic.CurrentMediaState.STOP;
+    }
   }
 
   async getTargetMediaState(): Promise<CharacteristicValue> {
-    // TODO
-    return this.platform.Characteristic.TargetMediaState.PLAY;
+    if (this.targetMediaState) {
+      this.log.debug(`getTargetMediaState for ${this.name}. [retrieving from cache]`);
+      return this.targetMediaState;
+    } else {
+      const raceStatus = new RaceStatus();
+      this.log.debug(`getTargetMediaState for ${this.name}. [race id: ${raceStatus.raceId}]`);
+      const playing = await this.getPlaying(raceStatus);
+      switch (playing) {
+        case Playing.PLAY:
+          return this.platform.Characteristic.TargetMediaState.PLAY;
+        case Playing.PAUSE:
+          return this.platform.Characteristic.TargetMediaState.PAUSE;
+        case Playing.STOP:
+        case Playing.UNSUPPORTED:
+          return this.platform.Characteristic.TargetMediaState.STOP;
+      }
+    }
   }
 
   async getMute(): Promise<CharacteristicValue> {
@@ -266,76 +314,137 @@ export class DenonAudioAccessory {
   setRemoteKey(remoteKey: CharacteristicValue) {
     switch (remoteKey) {
       case this.platform.Characteristic.RemoteKey.REWIND: {
-        this.log.info("set Remote Key Pressed: REWIND");
-        // TODO
+        // unsupported in iOS
         break;
       }
       case this.platform.Characteristic.RemoteKey.FAST_FORWARD: {
-        this.log.info("set Remote Key Pressed: FAST_FORWARD");
-        // TODO
+        // unsupported in iOS
         break;
       }
       case this.platform.Characteristic.RemoteKey.NEXT_TRACK: {
-        this.log.info("set Remote Key Pressed: NEXT_TRACK");
-        // TODO
+        // unsupported in iOS
+        this.setPlayNext();
         break;
       }
       case this.platform.Characteristic.RemoteKey.PREVIOUS_TRACK: {
-        this.log.info("set Remote Key Pressed: PREVIOUS_TRACK");
-        // TODO
+        // unsupported in iOS
+        this.setPlayPrevious();
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_UP: {
-        this.log.info("set Remote Key Pressed: ARROW_UP");
-        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_DOWN: {
-        this.log.info("set Remote Key Pressed: ARROW_DOWN");
-        // TODO
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_LEFT: {
-        this.log.info("set Remote Key Pressed: ARROW_LEFT");
-        // TODO
+        this.setPlayPrevious();
         break;
       }
       case this.platform.Characteristic.RemoteKey.ARROW_RIGHT: {
-        this.log.info("set Remote Key Pressed: ARROW_RIGHT");
-        // TODO
+        this.setPlayNext();
         break;
       }
       case this.platform.Characteristic.RemoteKey.SELECT: {
-        this.log.info("set Remote Key Pressed: SELECT");
-        // TODO
+        this.setPlayPauseToggle();
         break;
       }
       case this.platform.Characteristic.RemoteKey.BACK: {
-        this.log.info("set Remote Key Pressed: BACK");
-        // TODO
+        // unsupported in iOS
         break;
       }
       case this.platform.Characteristic.RemoteKey.EXIT: {
-        this.log.info("set Remote Key Pressed: EXIT");
-        // TODO
+        // unsupported in iOS
         break;
       }
       case this.platform.Characteristic.RemoteKey.PLAY_PAUSE: {
-        this.log.info("set Remote Key Pressed: PLAY_PAUSE");
-        // TODO
-        break;
+        this.setPlayPauseToggle();
       }
       case this.platform.Characteristic.RemoteKey.INFORMATION: {
-        this.log.info("set Remote Key Pressed: INFORMATION");
-        // TODO
         break;
       }
     }
   }
 
-  setTargetMediaState(newValue: CharacteristicValue) {
+  async setTargetMediaState(newValue: CharacteristicValue) {
     this.log.debug(`setTargetMediaState for ${this.name} set to ${newValue}`);
-    // TODO
+    if (this.playingChangeOngoing) {
+      this.log.debug(`setPlayPauseToggle for ${this.name} was called while another play state change is still ongoing. Ignoring this call.`);
+      return;
+    }
+
+    this.playingChangeOngoing = true;
+    switch (newValue) {
+      case this.platform.Characteristic.TargetMediaState.PLAY:
+        this.targetMediaState = Playing.PLAY;
+        break;
+      case this.platform.Characteristic.TargetMediaState.PAUSE:
+        this.targetMediaState = Playing.PAUSE;
+        break;
+      case this.platform.Characteristic.TargetMediaState.STOP:
+        this.targetMediaState = Playing.STOP;
+        break;
+      default:
+        throw new Error(`Unexpected target media state: ${newValue}`);
+    }
+
+    try {
+      await this.denonClient.setPlaying(this.targetMediaState);
+    } catch (error) {
+      this.log.error(`An error occured while setting mute status for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    } finally {
+      this.targetMediaState = undefined;
+      this.playingChangeOngoing = false;
+    }
+  }
+
+  async setPlayPauseToggle() {
+    const raceStatus = new RaceStatus();
+    this.log.debug(`setPlayPauseToggle for ${this.name} [race id: ${raceStatus.raceId}]`);
+    if (this.playingChangeOngoing) {
+      this.log.debug(`setPlayPauseToggle for ${this.name} was called while another play state change is still ongoing. Ignoring this call.`);
+      return;
+    }
+
+    try {
+      this.playingChangeOngoing = true;
+      const currentPlaying = await this.getPlaying(raceStatus);
+      switch (currentPlaying) {
+        case Playing.PLAY:
+          this.targetMediaState = Playing.PAUSE;
+          break;
+        case Playing.PAUSE:
+        case Playing.STOP:
+          this.targetMediaState = Playing.PLAY;
+          break;
+        case Playing.UNSUPPORTED:
+          return;
+      }
+      await this.denonClient.setPlaying(this.targetMediaState);
+    } catch (error) {
+      this.log.error(`An error occured while toggling play/pause for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    } finally {
+      this.targetMediaState = undefined;
+      this.playingChangeOngoing = false;
+    }
+  }
+
+  setPlayNext() {
+    this.log.debug(`setPlayNext for ${this.name}`);
+    this.denonClient.setPlayNext().catch((error) => {
+      this.log.error(`An error occured while setting play next for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    });
+  }
+
+  setPlayPrevious() {
+    this.log.debug(`setPlayPrevious for ${this.name}`);
+    this.denonClient.setPlayNext().catch((error) => {
+      this.log.error(`An error occured while setting play previous for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    });
   }
 
   setMute(newValue: CharacteristicValue) {
@@ -358,11 +467,10 @@ export class DenonAudioAccessory {
       this.log.debug(`setVolume for ${this.name} set to ${newValue}`);
       this.lastSetVolume = newValue as number;
       const volumetoSet = this.adjustToVolumeLimit(newValue as number);
-
-      this.denonClient.setVolume(volumetoSet).catch((error) => {
-        this.log.error(`An error occured while setting volume for ${this.name}.`, error);
-        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-      });
+      this.denonClient.setVolume(volumetoSet);
+    } catch (error) {
+      this.log.error(`An error occured while setting volume for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     } finally {
       this.volumeChangeOngoing = false;
     }

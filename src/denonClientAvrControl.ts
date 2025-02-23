@@ -1,4 +1,4 @@
-import { CommandMode, DenonClient, findMapByValue, findValueByMap, InvalidResponseException } from "./denonClient.js";
+import { CommandMode, DenonClient, findMapByValue, findValueByMap, InvalidResponseException, Playing } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 
 export class DenonClientAvrControl extends DenonClient {
@@ -194,6 +194,24 @@ export class DenonClientAvrControl extends DenonClient {
     });
     const mappedValue = findMapByValue(DenonClientAvrControl.PROTOCOL.POWER.VALUES, response);
     return mappedValue;
+  }
+
+  public async getPlaying(): Promise<Playing> {
+    // not supported
+    return Playing.UNSUPPORTED;
+  }
+
+  public async setPlaying(): Promise<Playing> {
+    // not supported
+    return Playing.UNSUPPORTED;
+  }
+
+  public async setPlayNext(): Promise<void> {
+    // not supported
+  }
+
+  public async setPlayPrevious(): Promise<void> {
+    // not supported
   }
 
   public async getMute(): Promise<boolean> {
