@@ -112,9 +112,7 @@ export class DenonClientAvrControl extends DenonClient {
     if (this.responseCallback) {
       let out: string | undefined = undefined;
       if (this.responseCallback.expectedResponse) {
-        console.log(this.responseCallback.expectedResponse);
         const match = response.match(this.responseCallback.expectedResponse);
-        console.log(JSON.stringify(match));
         if (match) {
           out = match[1] ?? match[0];
         }

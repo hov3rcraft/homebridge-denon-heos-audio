@@ -295,10 +295,8 @@ export class DenonClientHeosCli extends DenonClient {
         );
       }
 
-      console.log("Play state callback:", mappedValue);
-
       if (this.powerUpdateCallback) {
-        this.powerUpdateCallback(mappedValue);
+        this.powerUpdateCallback(isPlaying[mappedValue as Playing]);
       }
     }
   }
@@ -323,7 +321,6 @@ export class DenonClientHeosCli extends DenonClient {
       this.powerUpdateCallback(isPlaying[playing]);
       this.debugLog(`getPower was late to the party [race id: ${raceStatus.raceId}].`);
     }
-    console.log(isPlaying[playing]);
     return isPlaying[playing];
   }
 
