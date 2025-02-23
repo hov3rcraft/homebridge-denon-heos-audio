@@ -40,6 +40,7 @@ export class DenonClientHeosCli extends DenonClient {
       GET: {
         COMMAND: "player/get_players",
         PARAMS: "",
+        EXP_RES: /^$/,
       },
     },
     PLAY_STATE: {
@@ -112,6 +113,20 @@ export class DenonClientHeosCli extends DenonClient {
       EVENT: {
         EVENT: "event/player_volume_changed",
         EXP_RES: /level=(\d+)/,
+      },
+    },
+    VOLUME_UP: {
+      SET: {
+        COMMAND: "player/volume_up",
+        PARAMS: "?pid=[PID]&step=[VALUE]",
+        EXP_RES: /step=(\d+)/,
+      },
+    },
+    VOLUME_DOWN: {
+      SET: {
+        COMMAND: "player/volume_down",
+        PARAMS: "?pid=[PID]&step=[VALUE]",
+        EXP_RES: /step=(\d+)/,
       },
     },
   };
@@ -219,13 +234,9 @@ export class DenonClientHeosCli extends DenonClient {
 
       const pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
       if (!pid_match || Number(pid_match[1]) === this.player_id) {
-        if (this.responseCallback.expectedResponse) {
-          const value_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
-          if (value_match) {
-            out = value_match[1];
-          }
-        } else {
-          out = r_obj.heos.message;
+        const message_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
+        if (message_match) {
+          out = message_match.length > 1 ? message_match[1] : r_obj.heos.message;
         }
       }
 
@@ -243,6 +254,8 @@ export class DenonClientHeosCli extends DenonClient {
         if (this.params.all_responses_to_generic) {
           this.genericResponseHandler(r_obj);
         }
+      } else {
+        this.genericResponseHandler(r_obj);
       }
     } else {
       this.genericResponseHandler(r_obj);
@@ -282,6 +295,8 @@ export class DenonClientHeosCli extends DenonClient {
         );
       }
 
+      console.log("Play state callback:", mappedValue);
+
       if (this.powerUpdateCallback) {
         this.powerUpdateCallback(mappedValue);
       }
@@ -308,6 +323,7 @@ export class DenonClientHeosCli extends DenonClient {
       this.powerUpdateCallback(isPlaying[playing]);
       this.debugLog(`getPower was late to the party [race id: ${raceStatus.raceId}].`);
     }
+    console.log(isPlaying[playing]);
     return isPlaying[playing];
   }
 
@@ -375,8 +391,23 @@ export class DenonClientHeosCli extends DenonClient {
     return Number(response);
   }
 
-  public async setVolumeRelative(direction: boolean): Promise<number> {
-    // TODO
-    return -1;
+  public async setVolumeUp(volumeIncrement: number): Promise<void> {
+    if (volumeIncrement < 1 || volumeIncrement > 10) {
+      throw new Error("Volume increment must be between 1 and 10");
+    }
+
+    await this.sendCommand(DenonClientHeosCli.PROTOCOL.VOLUME_UP, CommandMode.SET, {
+      value: Math.round(volumeIncrement).toString(),
+    });
+  }
+
+  public async setVolumeDown(volumeDecrement: number): Promise<void> {
+    if (volumeDecrement < 1 || volumeDecrement > 10) {
+      throw new Error("Volume decrement must be between 1 and 10");
+    }
+
+    await this.sendCommand(DenonClientHeosCli.PROTOCOL.VOLUME_DOWN, CommandMode.SET, {
+      value: Math.round(volumeDecrement).toString(),
+    });
   }
 }

@@ -27,8 +27,8 @@ export class DenonClientHybrid implements IDenonClient {
       response_timeout,
       debugLogCallback,
       powerUpdateCallback,
-      muteUpdateCallback,
-      volumeUpdateCallback
+      undefined,
+      undefined
     );
     this.clientHeosCli = new DenonClientHeosCli(
       serialNumber,
@@ -36,7 +36,7 @@ export class DenonClientHybrid implements IDenonClient {
       connect_timeout,
       response_timeout,
       debugLogCallback,
-      powerUpdateCallback,
+      undefined,
       muteUpdateCallback,
       volumeUpdateCallback
     );
@@ -71,7 +71,11 @@ export class DenonClientHybrid implements IDenonClient {
     return this.clientHeosCli.setVolume(volume);
   }
 
-  public setVolumeRelative(direction: boolean): Promise<number> {
-    return this.clientHeosCli.setVolumeRelative(direction);
+  public setVolumeUp(volumeIncrement: number): Promise<void> {
+    return this.clientHeosCli.setVolumeUp(volumeIncrement);
+  }
+
+  public setVolumeDown(volumeDecrement: number): Promise<void> {
+    return this.clientHeosCli.setVolumeDown(volumeDecrement);
   }
 }

@@ -72,6 +72,15 @@
               "minimum": 0,
               "maximum": 99,
               "default": 99
+            },
+            "volumeStepSize": {
+              "title": "Volume Step Size",
+              "description": "Determines how many percentage points the volume is increased or descreased when volume up or down is pressed. This is measured in the device's percentage points - not converted for volume limit.",
+              "type": "integer",
+              "required": false,
+              "minimum": 1,
+              "maximum": 10,
+              "default": 2
             }
           }
         }

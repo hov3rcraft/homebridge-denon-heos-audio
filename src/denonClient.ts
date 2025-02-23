@@ -20,9 +20,10 @@ export interface IDenonClient {
   setPower(power: boolean): Promise<boolean>;
   getMute(raceStatus?: RaceStatus): Promise<boolean>;
   setMute(mute: boolean): Promise<boolean>;
-  getVolume(raceStatus?: RaceStatus): void;
+  getVolume(raceStatus?: RaceStatus): Promise<number>;
   setVolume(volume: number): Promise<number>;
-  setVolumeRelative(direction: boolean): Promise<number>;
+  setVolumeUp(volumeIncrement: number): Promise<void>;
+  setVolumeDown(volumeDecrement: number): Promise<void>;
 }
 
 export abstract class DenonClient implements IDenonClient {
@@ -189,24 +190,31 @@ export abstract class DenonClient implements IDenonClient {
   }
 
   protected async sendUnchecked(command: string, rawCommand?: string, expectedResponse?: RegExp, passPayload: boolean = false): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-      const fullCommand = this.params.command_prefix ? this.params.command_prefix + command : command;
-      this.debugLog("Sending command:", fullCommand);
-      this.responseCallback = new ResponseCallback(
-        (response) => {
-          resolve(response);
-        },
-        rawCommand ?? command,
-        expectedResponse,
-        passPayload
-      );
-      this.socket!.write(fullCommand + this.params.command_separator);
-      setTimeout(() => {
-        reject(new ResponseTimeoutException(fullCommand, this.params.response_timeout));
-      }, this.params.response_timeout);
-    }).finally(() => {
-      this.responseCallback = undefined;
-    });
+    const fullCommand = this.params.command_prefix ? this.params.command_prefix + command : command;
+    this.debugLog("Sending command:", fullCommand);
+    if (expectedResponse) {
+      return new Promise<string>((resolve, reject) => {
+        this.responseCallback = new ResponseCallback(
+          (response) => {
+            resolve(response);
+          },
+          rawCommand ?? command,
+          expectedResponse,
+          passPayload
+        );
+        this.socket!.write(fullCommand + this.params.command_separator);
+        setTimeout(() => {
+          reject(new ResponseTimeoutException(fullCommand, this.params.response_timeout));
+        }, this.params.response_timeout);
+      }).finally(() => {
+        this.responseCallback = undefined;
+      });
+    } else {
+      return new Promise<string>((resolve, reject) => {
+        this.socket!.write(fullCommand + this.params.command_separator);
+        resolve("");
+      });
+    }
   }
 
   private async dataHandler(incomingData: any) {
@@ -248,7 +256,9 @@ export abstract class DenonClient implements IDenonClient {
 
   public abstract setVolume(volume: number): Promise<number>;
 
-  public abstract setVolumeRelative(direction: boolean): Promise<number>;
+  public abstract setVolumeUp(volumeIncrement: number): Promise<void>;
+
+  public abstract setVolumeDown(volumeDecrement: number): Promise<void>;
 }
 
 export enum CommandMode {
@@ -259,10 +269,10 @@ export enum CommandMode {
 class ResponseCallback {
   public readonly callback: (response: string) => void;
   public readonly command: string;
-  public readonly expectedResponse: RegExp | undefined;
+  public readonly expectedResponse: RegExp;
   public readonly passPayload: boolean;
 
-  constructor(callback: (response: string) => void, command: string, expectedResponse?: RegExp, passPayload = false) {
+  constructor(callback: (response: string) => void, command: string, expectedResponse: RegExp, passPayload = false) {
     this.callback = callback;
     this.command = command;
     this.expectedResponse = expectedResponse;

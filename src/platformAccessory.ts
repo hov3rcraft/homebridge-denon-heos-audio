@@ -31,9 +31,12 @@ export class DenonAudioAccessory {
   private readonly ip: string;
   private readonly serialNumber: string;
   private readonly controlMode: DenonProtocol.ControlMode;
+  private readonly volumeStepSize: number;
   private readonly volumeLimit: number | undefined;
 
   private lastSetVolume: number | undefined;
+
+  private volumeChangeOngoing = false;
 
   constructor(platform: DenonAudioPlatform, accessory: PlatformAccessory, config: any, log: Logger) {
     log.debug("Initializing DenonAudioAccessory...");
@@ -52,6 +55,11 @@ export class DenonAudioAccessory {
       throw new Error("Volume limit must be between 0 and 99");
     }
     this.volumeLimit = config.volumeLimitEnabled ? config.volumeLimit : undefined;
+
+    if (config.volumeStepSize < 1 || config.volumeStepSize > 10) {
+      throw new Error("Volume step size must be between 1 and 10");
+    }
+    this.volumeStepSize = config.volumeStepSize;
 
     // set accessory category
     accessory.category = this.platform.api.hap.Categories.TELEVISION;
@@ -223,7 +231,7 @@ export class DenonAudioAccessory {
           }, DenonAudioAccessory.CALLBACK_TIMEOUT);
         }),
       ]);
-      return this.adjustBackFromVolumeLimit(volume as number);
+      return this.adjustBackFromVolumeLimit(volume);
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getVolume(). [race id: ${raceStatus.raceId}]`);
@@ -338,24 +346,58 @@ export class DenonAudioAccessory {
     });
   }
 
-  setVolume(newValue: CharacteristicValue) {
+  async setVolume(newValue: CharacteristicValue) {
     this.log.debug(`setVolume for ${this.name} set to ${newValue}`);
-    this.lastSetVolume = newValue as number;
-    const volumetoSet = this.adjustToVolumeLimit(newValue as number);
+    if (this.volumeChangeOngoing) {
+      this.log.debug(`setVolume for ${this.name} was called while another volume change is still ongoing. Ignoring this call.`);
+      return;
+    }
 
-    this.denonClient.setVolume(volumetoSet).catch((error) => {
-      this.log.error(`An error occured while setting volume for ${this.name}.`, error);
-      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-    });
+    try {
+      this.volumeChangeOngoing = true;
+      this.log.debug(`setVolume for ${this.name} set to ${newValue}`);
+      this.lastSetVolume = newValue as number;
+      const volumetoSet = this.adjustToVolumeLimit(newValue as number);
+
+      this.denonClient.setVolume(volumetoSet).catch((error) => {
+        this.log.error(`An error occured while setting volume for ${this.name}.`, error);
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      });
+    } finally {
+      this.volumeChangeOngoing = false;
+    }
   }
 
-  setVolumeSelector(direction: CharacteristicValue) {
-    if (direction === this.platform.Characteristic.VolumeSelector.INCREMENT) {
-      this.log.info("volume INCREMENT pressed");
-      // TODO
-    } else if (direction === this.platform.Characteristic.VolumeSelector.DECREMENT) {
-      this.log.info("volume DECREMENT pressed");
-      // TODO
+  async setVolumeSelector(direction: CharacteristicValue) {
+    if (this.volumeChangeOngoing) {
+      this.log.debug(`setVolumeSelector for ${this.name} was called while another volume change is still ongoing. Ignoring this call.`);
+      return;
+    }
+
+    try {
+      this.volumeChangeOngoing = true;
+      this.log.debug(`setVolumeSelector for ${this.name} set to ${direction}`);
+      if (direction === this.platform.Characteristic.VolumeSelector.INCREMENT) {
+        if (this.volumeLimit) {
+          const current_volume_device = await this.denonClient.getVolume();
+          if (this.volumeLimit - current_volume_device <= 0) {
+            // do nothing - volume limit reached
+          } else if (this.volumeLimit - current_volume_device < this.volumeStepSize) {
+            await this.denonClient.setVolumeUp(this.volumeLimit - current_volume_device);
+          } else {
+            await this.denonClient.setVolumeUp(this.volumeStepSize);
+          }
+        } else {
+          await this.denonClient.setVolumeUp(this.volumeStepSize);
+        }
+      } else if (direction === this.platform.Characteristic.VolumeSelector.DECREMENT) {
+        await this.denonClient.setVolumeDown(this.volumeStepSize);
+      }
+    } catch (error) {
+      this.log.error(`An error occured while decrementing volume for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    } finally {
+      this.volumeChangeOngoing = false;
     }
   }
 

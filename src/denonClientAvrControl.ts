@@ -61,6 +61,16 @@ export class DenonClientAvrControl extends DenonClient {
         EXP_RES: /^MV(\d{2})$/,
       },
     },
+    VOLUME_UP: {
+      SET: {
+        COMMAND: "MVUP",
+      },
+    },
+    VOLUME_DOWN: {
+      SET: {
+        COMMAND: "MVDOWN",
+      },
+    },
   };
 
   constructor(
@@ -222,8 +232,23 @@ export class DenonClientAvrControl extends DenonClient {
     return Number(response);
   }
 
-  public async setVolumeRelative(direction: boolean): Promise<number> {
-    // TODO
-    return -1;
+  public async setVolumeUp(volumeIncrement: number): Promise<void> {
+    if (volumeIncrement < 1 || volumeIncrement > 10) {
+      throw new Error("Volume increment must be between 1 and 10");
+    }
+
+    for (let i = 0; i < Math.round(volumeIncrement); i++) {
+      await this.sendCommand(DenonClientAvrControl.PROTOCOL.VOLUME_UP, CommandMode.SET, {});
+    }
+  }
+
+  public async setVolumeDown(volumeDecrement: number): Promise<void> {
+    if (volumeDecrement < 1 || volumeDecrement > 10) {
+      throw new Error("Volume decrement must be between 1 and 10");
+    }
+
+    for (let i = 0; i < Math.round(volumeDecrement); i++) {
+      await this.sendCommand(DenonClientAvrControl.PROTOCOL.VOLUME_DOWN, CommandMode.SET, {});
+    }
   }
 }
