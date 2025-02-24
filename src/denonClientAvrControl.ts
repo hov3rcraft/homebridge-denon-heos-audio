@@ -56,9 +56,9 @@ export class DenonClientAvrControl extends DenonClient {
         EXP_RES: /^MV(\d{2})$/,
       },
       SET: {
-        COMMAND: "MV?",
+        COMMAND: "MV",
         PARAMS: "[VALUE]",
-        EXP_RES: /^MV(\d{2})$/,
+        EXP_RES: /^MV(\d{2})5?$/,
       },
     },
     VOLUME_UP: {
