@@ -12,7 +12,7 @@ Bug reports and feature suggestions are welcome, please head to the [issues](htt
 
 ## Supported Devices
 
-This plugin should support any Denon smart speakers, stereos, and AVRs that support AVR control and/or Heos.
+This plugin should work with any Denon smart speakers, stereos, and AVRs that support AVR control and/or Heos.
 
 I am using the following devices for testing:
 
