@@ -214,7 +214,7 @@ export abstract class DenonClient implements IDenonClient {
         this.responseCallback = undefined;
       });
     } else {
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<string>((resolve) => {
         this.socket!.write(fullCommand + this.params.command_separator);
         resolve("");
       });

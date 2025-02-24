@@ -359,6 +359,7 @@ export class DenonAudioAccessory {
       }
       case this.platform.Characteristic.RemoteKey.PLAY_PAUSE: {
         this.setPlayPauseToggle();
+        break;
       }
       case this.platform.Characteristic.RemoteKey.INFORMATION: {
         break;
