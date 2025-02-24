@@ -300,7 +300,7 @@ export class DenonAudioAccessory {
 
   setActive(newValue: CharacteristicValue) {
     this.log.debug(`setActive for ${this.name} set to ${newValue}`);
-    this.denonClient.setPower(newValue as boolean).catch((error) => {
+    this.denonClient.setPower(newValue === this.platform.Characteristic.Active.ACTIVE).catch((error) => {
       this.log.error(`An error occured while setting power status for ${this.name}.`, error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     });
