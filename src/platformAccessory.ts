@@ -442,7 +442,7 @@ export class DenonAudioAccessory {
 
   setPlayPrevious() {
     this.log.debug(`setPlayPrevious for ${this.name}`);
-    this.denonClient.setPlayNext().catch((error) => {
+    this.denonClient.setPlayPrevious().catch((error) => {
       this.log.error(`An error occured while setting play previous for ${this.name}.`, error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     });
