@@ -53,7 +53,7 @@ export class DenonClientAvrControl extends DenonClient {
       GET: {
         COMMAND: "MV?",
         PARAMS: "",
-        EXP_RES: /^MV(\d{2})$/,
+        EXP_RES: /^MV(\d{2})5?$/,
       },
       SET: {
         COMMAND: "MV",
