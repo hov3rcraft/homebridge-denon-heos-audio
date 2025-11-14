@@ -153,7 +153,8 @@ export class DenonClientHeosCli extends DenonClient {
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
-    volumeUpdateCallback?: (volume: number) => void
+    volumeUpdateCallback?: (volume: number) => void,
+    inputUpdateCallback?: (input: string) => void
   ) {
     super(
       serialNumber,
@@ -170,7 +171,8 @@ export class DenonClientHeosCli extends DenonClient {
       debugLogCallback,
       powerUpdateCallback,
       muteUpdateCallback,
-      volumeUpdateCallback
+      volumeUpdateCallback,
+      inputUpdateCallback
     );
 
     this.player_id = undefined;
@@ -426,5 +428,13 @@ export class DenonClientHeosCli extends DenonClient {
     await this.sendCommand(DenonClientHeosCli.PROTOCOL.VOLUME_DOWN, CommandMode.SET, {
       value: Math.round(volumeDecrement).toString(),
     });
+  }
+
+  public getInput(): Promise<string> {
+    return Promise.resolve("NOT IMPLEMENTED"); // TODO
+  }
+
+  public async setInput(inputID: string): Promise<string> {
+    return Promise.resolve("NOT IMPLEMENTED"); // TODO
   }
 }

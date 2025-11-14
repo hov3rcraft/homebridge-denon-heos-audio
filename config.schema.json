@@ -81,6 +81,70 @@
               "minimum": 1,
               "maximum": 10,
               "default": 2
+            },
+            "inputs": {
+              "title": "Inputs",
+              "description": "The list of inputs to your device.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "inputID": {
+                    "title": "Input ID",
+                    "type": "string",
+                    "placeholder": "AUX1",
+                    "required": true,
+                    "typeahead": {
+                      "source": [
+                        "ANALOG1",
+                        "ANALOG2",
+                        "AUX1",
+                        "AUX2",
+                        "BD",
+                        "CBL/SAT",
+                        "CD",
+                        "DOCK",
+                        "DVD",
+                        "FAVORITES",
+                        "GAME",
+                        "GAME2",
+                        "IPOD",
+                        "IRADIO",
+                        "IRP",
+                        "LASTFM",
+                        "MPLAY",
+                        "NET",
+                        "NET/USB",
+                        "NETWORK",
+                        "OPTICAL1",
+                        "OPTICAL2",
+                        "PANDORA",
+                        "RHAPSODY",
+                        "SAT/CBL",
+                        "SERVER",
+                        "SPOTIFY",
+                        "TUNER",
+                        "TV",
+                        "USB/IPOD"
+                      ]
+                    }
+                  },
+                  "name": {
+                    "title": "Display Name",
+                    "type": "string",
+                    "placeholder": "Aux",
+                    "required": true,
+                    "minLength": 1
+                  },
+                  "showInList": {
+                    "title": "Show in Input List",
+                    "description": "If disabled, this input will not be shown in the list of selectable inputs in HomeKit.",
+                    "type": "boolean",
+                    "required": false,
+                    "default": true
+                  }
+                }
+              }
             }
           }
         },

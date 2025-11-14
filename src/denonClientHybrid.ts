@@ -18,7 +18,8 @@ export class DenonClientHybrid implements IDenonClient {
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
-    volumeUpdateCallback?: (volume: number) => void
+    volumeUpdateCallback?: (volume: number) => void,
+    inputUpdateCallback?: (input: string) => void
   ) {
     this.clientAvrControl = new DenonClientAvrControl(
       serialNumber,
@@ -38,7 +39,8 @@ export class DenonClientHybrid implements IDenonClient {
       debugLogCallback,
       undefined,
       muteUpdateCallback,
-      volumeUpdateCallback
+      volumeUpdateCallback,
+      inputUpdateCallback
     );
     this.serialNumber = serialNumber;
   }
@@ -93,5 +95,13 @@ export class DenonClientHybrid implements IDenonClient {
 
   public setVolumeDown(volumeDecrement: number): Promise<void> {
     return this.clientHeosCli.setVolumeDown(volumeDecrement);
+  }
+
+  public getInput(): Promise<string> {
+    return Promise.resolve("NOT IMPLEMENTED"); // TODO
+  }
+
+  public async setInput(inputID: string): Promise<string> {
+    return Promise.resolve("NOT IMPLEMENTED"); // TODO
   }
 }

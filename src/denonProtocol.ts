@@ -21,7 +21,8 @@ export const CLIENT_MAP: Record<
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
-    volumeUpdateCallback?: (volume: number) => void
+    volumeUpdateCallback?: (volume: number) => void,
+    inputUpdateCallback?: (input: string) => void
   ) => IDenonClient
 > = {
   [ControlMode.AVRCONTROL]: DenonClientAvrControl,

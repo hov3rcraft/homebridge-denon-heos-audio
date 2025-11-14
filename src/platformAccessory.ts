@@ -7,6 +7,7 @@ import { PromiseTimeoutException } from "./promiseTimeoutException.js";
 import { IDenonClient, Playing, RaceStatus } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 import * as CustomLogging from "./customLogging.js";
+import internal from "stream";
 
 /**
  * Platform Accessory
@@ -24,6 +25,7 @@ export class DenonAudioAccessory {
   private readonly informationService: Service;
   private readonly tvService: Service;
   private readonly speakerService: Service;
+  private readonly inputServices: Service[] = [];
   private readonly rawLog: Logger;
   private readonly log: Logger;
 
@@ -33,6 +35,9 @@ export class DenonAudioAccessory {
   private readonly controlMode: DenonProtocol.ControlMode;
   private readonly volumeStepSize: number;
   private readonly volumeLimit: number | undefined;
+
+  private configuredInputsByIdentifier: Map<number, ConfiguredInput> = new Map();
+  private configuredInputsByInputId: Map<string, ConfiguredInput> = new Map();
 
   private lastSetVolume: number | undefined;
   private targetMediaState: CharacteristicValue | undefined;
@@ -102,6 +107,39 @@ export class DenonAudioAccessory {
     this.speakerService.getCharacteristic(this.platform.Characteristic.VolumeSelector).onSet(this.setVolumeSelector.bind(this));
     this.speakerService.setCharacteristic(this.platform.Characteristic.VolumeControlType, this.platform.Characteristic.VolumeControlType.ABSOLUTE);
 
+    // add input source services
+    if (config.inputs) {
+      let i = 1;
+      for (const config_input of config.inputs) {
+        if (this.configuredInputsByInputId.has(config_input.inputID)) {
+          log.warn(`Duplicate input ID found in configuration: ${config_input.inputID}. Skipping this input.`);
+          continue;
+        }
+
+        const configured_input = new ConfiguredInput(config_input.inputID, config_input.name, config.showInList, i, true);
+        this.configuredInputsByInputId.set(config_input.inputID, configured_input);
+        this.configuredInputsByIdentifier.set(i, configured_input);
+
+        const inputService =
+          this.accessory.getService(`${this.name} Input ${configured_input.inputID}`) ||
+          this.accessory.addService(this.platform.Service.InputSource, `${this.name} Input ${configured_input.inputID}`, configured_input.inputID);
+        inputService.setCharacteristic(this.platform.Characteristic.Identifier, i);
+        inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, config_input.inputID);
+        inputService.setCharacteristic(this.platform.Characteristic.InputSourceType, this.platform.Characteristic.InputSourceType.OTHER);
+        inputService.setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED);
+        inputService.setCharacteristic(
+          this.platform.Characteristic.CurrentVisibilityState,
+          config_input.showInList ? this.platform.Characteristic.CurrentVisibilityState.SHOWN : this.platform.Characteristic.CurrentVisibilityState.HIDDEN
+        );
+        this.tvService.addLinkedService(inputService);
+        this.inputServices.push(inputService);
+
+        log.info(`Added input source service for input ID ${configured_input.inputID} with identifier ${configured_input.identifier}.`);
+
+        i++;
+      }
+    }
+
     // choose appropriate client
     this.denonClient = new DenonProtocol.CLIENT_MAP[this.controlMode](
       this.serialNumber,
@@ -111,7 +149,8 @@ export class DenonAudioAccessory {
       this.log.debug.bind(this.log),
       this.callbackActive.bind(this),
       this.callbackMute.bind(this),
-      this.callbackVolume.bind(this)
+      this.callbackVolume.bind(this),
+      this.callbackInput.bind(this)
     );
 
     this.log.info("Finished initializing accessory.");
@@ -172,7 +211,7 @@ export class DenonAudioAccessory {
       ]);
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
-        this.log.debug(`${this.name} lost its promise race for getOn(). [race id: ${raceStatus.raceId}]`);
+        this.log.debug(`${this.name} lost its promise race for getActive(). [race id: ${raceStatus.raceId}]`);
       } else {
         this.log.error(`An error occured while getting power status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
@@ -181,8 +220,30 @@ export class DenonAudioAccessory {
   }
 
   async getActiveIdentifier(): Promise<CharacteristicValue> {
-    // TODO - related to input sources
-    return 1;
+    const raceStatus = new RaceStatus();
+    this.log.debug(`getActiveIdentifier for ${this.name}. [race id: ${raceStatus.raceId}]`);
+
+    try {
+      let current_input = await Promise.race([
+        this.denonClient.getInput(raceStatus),
+        new Promise<string>((resolve, reject) => {
+          setTimeout(() => {
+            raceStatus.setRaceOver();
+            reject(new PromiseTimeoutException(DenonAudioAccessory.CALLBACK_TIMEOUT));
+          }, DenonAudioAccessory.CALLBACK_TIMEOUT);
+        }),
+      ]);
+      console.log(current_input);
+      console.log(this.configuredInputsByInputId.get(current_input)?.identifier);
+      return this.configuredInputsByInputId.get(current_input)?.identifier || 1; // TODO handle unknown input better
+    } catch (error) {
+      if (error instanceof PromiseTimeoutException) {
+        this.log.debug(`${this.name} lost its promise race for getActiveIdentifier(). [race id: ${raceStatus.raceId}]`);
+      } else {
+        this.log.error(`An error occured while getting current input for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
+      }
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
   private async getPlaying(raceStatus: RaceStatus): Promise<Playing> {
@@ -308,7 +369,16 @@ export class DenonAudioAccessory {
 
   setActiveIdentifier(newValue: CharacteristicValue) {
     this.log.debug(`setActiveIdentifier for ${this.name} set to ${newValue}`);
-    // TODO - related to input sources
+
+    if (!this.configuredInputsByIdentifier.has(newValue as number)) {
+      this.log.error(`An error occured while setting input for ${this.name}. Input identifier ${newValue} is not configured.`);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
+    }
+
+    this.denonClient.setInput(this.configuredInputsByIdentifier.get(newValue as number)!.inputID).catch((error) => {
+      this.log.error(`An error occured while setting input for ${this.name}.`, error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    });
   }
 
   setRemoteKey(remoteKey: CharacteristicValue) {
@@ -525,6 +595,11 @@ export class DenonAudioAccessory {
     this.speakerService.updateCharacteristic(this.platform.Characteristic.Volume, this.adjustBackFromVolumeLimit(volume));
   }
 
+  private callbackInput(inputID: string) {
+    const inputIdentifier = this.configuredInputsByInputId.get(inputID)?.identifier || 1; // TODO handle unknown input better
+    this.tvService.updateCharacteristic(this.platform.Characteristic.ActiveIdentifier, inputIdentifier);
+  }
+
   /*
    * Volume Limit Helpers
    */
@@ -546,5 +621,21 @@ export class DenonAudioAccessory {
     } else {
       return volume;
     }
+  }
+}
+
+class ConfiguredInput {
+  inputID: string;
+  displayName: string;
+  showInList: boolean;
+  identifier: number;
+  userDefined: boolean;
+
+  constructor(inputID: string, displayName: string, showInList: boolean, identifier: number, userDefined: boolean) {
+    this.inputID = inputID;
+    this.displayName = displayName;
+    this.showInList = showInList;
+    this.identifier = identifier;
+    this.userDefined = userDefined;
   }
 }

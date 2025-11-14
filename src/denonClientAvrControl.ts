@@ -71,6 +71,18 @@ export class DenonClientAvrControl extends DenonClient {
         COMMAND: "MVDOWN",
       },
     },
+    INPUT: {
+      GET: {
+        COMMAND: "SI?",
+        PARAMS: "",
+        EXP_RES: /^SI(\w+)$/,
+      },
+      SET: {
+        COMMAND: "SI",
+        PARAMS: "[VALUE]",
+        EXP_RES: /^SI(\w+)$/,
+      },
+    },
   };
 
   constructor(
@@ -81,7 +93,8 @@ export class DenonClientAvrControl extends DenonClient {
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
-    volumeUpdateCallback?: (volume: number) => void
+    volumeUpdateCallback?: (volume: number) => void,
+    inputUpdateCallback?: (input: string) => void
   ) {
     super(
       serialNumber,
@@ -98,7 +111,8 @@ export class DenonClientAvrControl extends DenonClient {
       debugLogCallback,
       powerUpdateCallback,
       muteUpdateCallback,
-      volumeUpdateCallback
+      volumeUpdateCallback,
+      inputUpdateCallback
     );
 
     this.connect();
@@ -177,6 +191,15 @@ export class DenonClientAvrControl extends DenonClient {
     if (match) {
       if (this.volumeUpdateCallback) {
         this.volumeUpdateCallback(Number(match[1]));
+      }
+      return;
+    }
+
+    // Input
+    match = response.match(DenonClientAvrControl.PROTOCOL.INPUT.GET.EXP_RES);
+    if (match) {
+      if (this.inputUpdateCallback) {
+        this.inputUpdateCallback(match[1]);
       }
       return;
     }
@@ -266,5 +289,17 @@ export class DenonClientAvrControl extends DenonClient {
     for (let i = 0; i < Math.round(volumeDecrement); i++) {
       await this.sendCommand(DenonClientAvrControl.PROTOCOL.VOLUME_DOWN, CommandMode.SET, {});
     }
+  }
+
+  public async getInput(): Promise<string> {
+    const response = await this.sendCommand(DenonClientAvrControl.PROTOCOL.INPUT, CommandMode.GET, {});
+    return response;
+  }
+
+  public async setInput(inputID: string): Promise<string> {
+    const response = await this.sendCommand(DenonClientAvrControl.PROTOCOL.INPUT, CommandMode.SET, {
+      value: inputID,
+    });
+    return response;
   }
 }

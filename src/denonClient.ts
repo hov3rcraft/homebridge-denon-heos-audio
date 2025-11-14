@@ -28,6 +28,8 @@ export interface IDenonClient {
   setVolume(volume: number): Promise<number>;
   setVolumeUp(volumeIncrement: number): Promise<void>;
   setVolumeDown(volumeDecrement: number): Promise<void>;
+  getInput(raceStatus?: RaceStatus): Promise<string>;
+  setInput(inputID: string): Promise<string>;
 }
 
 export abstract class DenonClient implements IDenonClient {
@@ -43,6 +45,7 @@ export abstract class DenonClient implements IDenonClient {
   protected powerUpdateCallback;
   protected muteUpdateCallback;
   protected volumeUpdateCallback;
+  protected inputUpdateCallback;
 
   constructor(
     serialNumber: string,
@@ -50,7 +53,8 @@ export abstract class DenonClient implements IDenonClient {
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
-    volumeUpdateCallback?: (volume: number) => void
+    volumeUpdateCallback?: (volume: number) => void,
+    inputUpdateCallback?: (input: string) => void
   ) {
     this.serialNumber = serialNumber;
     this.params = params;
@@ -65,6 +69,7 @@ export abstract class DenonClient implements IDenonClient {
     this.powerUpdateCallback = powerUpdateCallback;
     this.muteUpdateCallback = muteUpdateCallback;
     this.volumeUpdateCallback = volumeUpdateCallback;
+    this.inputUpdateCallback = inputUpdateCallback;
   }
 
   protected async connect(): Promise<void> {
@@ -274,6 +279,10 @@ export abstract class DenonClient implements IDenonClient {
   public abstract setVolumeUp(volumeIncrement: number): Promise<void>;
 
   public abstract setVolumeDown(volumeDecrement: number): Promise<void>;
+
+  public abstract getInput(raceStatus?: RaceStatus): Promise<string>;
+
+  public abstract setInput(inputID: string): Promise<string>;
 }
 
 export enum CommandMode {
