@@ -8,7 +8,7 @@
     "properties": {
       "deviceDiscovery": {
         "title": "Device Discovery",
-        "description": "Enable to automatically discover Denon devices on your network. (Found devices will be listed in the homebridge log after the plugin has started. Ensure that your homebridge's log level is at least set to 'info' or enable the debug log below.)",
+        "description": "Enable to automatically discover Denon devices on your network. (Found devices will be listed in the homebridge log after the plugin has started. Ensure that your homebridge's log level is at least set to 'info' or enable the console log below.)",
         "type": "boolean",
         "required": false,
         "default": true
@@ -81,6 +81,27 @@
               "minimum": 1,
               "maximum": 10,
               "default": 2
+            }
+          }
+        },
+        "sources": {
+          "title": "Selectable playing sources",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sourceID": {
+                "title": "Source ID",
+                "description": "If you don't know the source ID of the playing source, activate \"playing source logging\" for this device, switch sources manually and look out for the input IDs in the homebridge log.",
+                "type": "string",
+                "required": true
+              },
+              "name": {
+                "title": "Source name",
+                "description": "Choose a display name for this playing source.",
+                "type": "string",
+                "required": true
+              }
             }
           }
         }
