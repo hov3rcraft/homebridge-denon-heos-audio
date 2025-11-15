@@ -141,7 +141,55 @@ export class DenonClientHeosCli extends DenonClient {
         EXP_RES: /step=(\d+)/,
       },
     },
+    SOURCE: {
+      GET: {
+        COMMAND: "player/get_now_playing_media",
+        PARAMS: "?pid=[PID]",
+        EXP_RES: /sid=(\d+)/,
+      },
+      SET: {
+        COMMAND: "browse/play_input",
+        PARAMS: "?pid=[PID]&sid=[VALUE]",
+        EXP_RES: /sid=(\w+)/,
+      },
+    },
+    INPUT: {
+      GET: {
+        COMMAND: "player/get_now_playing_media",
+        PARAMS: "?pid=[PID]",
+        EXP_RES: /(album_id=inputs\/\w+)?/,
+      },
+      SET: {
+        COMMAND: "browse/play_input",
+        PARAMS: "?pid=[PID]&input=[VALUE]",
+        EXP_RES: /input=(\w+)/,
+      },
+    },
   };
+
+  protected static readonly SOURCES: {
+    "sources/pandora": 1,
+    "sources/rhapsody": 2,
+    "sources/tunein": 3,
+    "sources/spotify": 4,
+    "sources/deezer": 5,
+    "sources/napster": 6,
+    "sources/iheartradio": 7,
+    "sources/siriusxm": 8,
+    "sources/soundcloud": 9,
+    "sources/tidal": 10,
+    "sources/rdio": 12,
+    "sources/amazonmusic": 13,
+    "sources/moodmix": 15,
+    "sources/juke": 16,
+    "sources/qqmusic": 18,
+    "sources/qobuz": 30,
+    "sources/local": 1024,
+    "sources/heos_playlists": 1025,
+    "sources/heos_history": 1026,
+    "sources/heos_auxinputs": 1027,
+    "sources/heos_favorites": 1028
+  }
 
   private player_id: number | undefined;
 
