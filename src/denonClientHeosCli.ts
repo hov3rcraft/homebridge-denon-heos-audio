@@ -152,7 +152,7 @@ export class DenonClientHeosCli extends DenonClient {
         COMMAND: "browse/play_input",
         PARAMS: "?pid=[PID]&input=inputs/[VALUE]",
         EXP_RES: /input=inputs\/(\w+)/,
-      },
+      }, // TODO implement change event
     },
   };
 
@@ -528,7 +528,6 @@ export class DenonClientHeosCli extends DenonClient {
       this.inputUpdateCallback(inputID);
       this.debugLog(`getInput was late to the party [race id: ${raceStatus.raceId}].`);
     }
-    console.log("getInput response:", inputID);
     return inputID;
   }
 
@@ -564,7 +563,7 @@ export class DenonClientHeosCli extends DenonClient {
     const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.INPUT, CommandMode.SET, {
       value: inputID,
     });
-    console.log("setInput response:", response);
+    console.log("setInput response:", response); // TODO check
     return response;
   }
 }
