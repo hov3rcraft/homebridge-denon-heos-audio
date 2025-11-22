@@ -1,4 +1,4 @@
-import { CommandMode, DenonClient, findMapByValue, findValueByMap, InvalidResponseException, Playing } from "./denonClient.js";
+import { CommandMode, DefaultInput, DenonClient, findMapByValue, findValueByMap, InvalidResponseException, Playing } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 
 export class DenonClientAvrControl extends DenonClient {
@@ -85,6 +85,39 @@ export class DenonClientAvrControl extends DenonClient {
     },
   };
 
+  public static readonly DEFAULT_INPUT_SOURCES = [
+    new DefaultInput("ANALOG1", "Analog 1"),
+    new DefaultInput("ANALOG2", "Analog 2"),
+    new DefaultInput("AUX1", "AUX 1"),
+    new DefaultInput("AUX2", "AUX 2"),
+    new DefaultInput("BD", "Blu-ray"),
+    new DefaultInput("CBL/SAT", "Cable/SAT"),
+    new DefaultInput("CD", "CD"),
+    new DefaultInput("DOCK", "Dock"),
+    new DefaultInput("DVD", "DVD"),
+    new DefaultInput("FAVORITES", "Favorites"),
+    new DefaultInput("GAME", "Game"),
+    new DefaultInput("GAME2", "Game 2"),
+    new DefaultInput("IPOD", "iPod"),
+    new DefaultInput("IRADIO", "Internet Radio"),
+    new DefaultInput("IRP", "Internet Radio Presets"),
+    new DefaultInput("LASTFM", "LastFM"),
+    new DefaultInput("MPLAY", "Music Play"),
+    new DefaultInput("NET", "Local Network"),
+    new DefaultInput("NET/USB", "Network/USB"),
+    new DefaultInput("NETWORK", "Network"),
+    new DefaultInput("OPTICAL1", "Optical 1"),
+    new DefaultInput("OPTICAL2", "Optical 2"),
+    new DefaultInput("PANDORA", "Pandora"),
+    new DefaultInput("RHAPSODY", "Rhapsody"),
+    new DefaultInput("SAT/CBL", "SAT/Cable"),
+    new DefaultInput("SERVER", "Media Server"),
+    new DefaultInput("SPOTIFY", "Spotify"),
+    new DefaultInput("TUNER", "Tuner"),
+    new DefaultInput("TV", "TV"),
+    new DefaultInput("USB", "USB"),
+  ];
+
   constructor(
     serialNumber: string,
     host: string,
@@ -108,6 +141,7 @@ export class DenonClientAvrControl extends DenonClient {
         response_separator: "\r",
         all_responses_to_generic: false,
       },
+      DenonClientAvrControl.DEFAULT_INPUT_SOURCES,
       debugLogCallback,
       powerUpdateCallback,
       muteUpdateCallback,

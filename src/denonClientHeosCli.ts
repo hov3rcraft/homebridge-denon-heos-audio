@@ -1,6 +1,7 @@
 import {
   CommandFailedException,
   CommandMode,
+  DefaultInput,
   DenonClient,
   findMapByValue,
   findValueByMap,
@@ -155,29 +156,81 @@ export class DenonClientHeosCli extends DenonClient {
     },
   };
 
-  protected static readonly HEOS_SOURCES = {
-    1: "Pandora",
-    2: "Rhapsody",
-    3: "TuneIn",
-    4: "Spotify",
-    5: "Deezer",
-    6: "Napster",
-    7: "iHeartRadio",
-    8: "SiriusXM",
-    9: "SoundCloud",
-    10: "Tidal",
-    12: "Rdio",
-    13: "Amazon Music",
-    15: "Mood Mix",
-    16: "Juke",
-    18: "QQ Music",
-    30: "qobuz",
-    1024: "Local Network",
-    1025: "HEOS Playlists",
-    1026: "HEOS History",
-    1027: "AUX Inputs",
-    1028: "HEOS Favorites",
+  public static readonly HEOS_SOURCES = {
+    1: new DefaultInput("pandora", "Pandora"),
+    2: new DefaultInput("rhapsody", "Rhapsody"),
+    3: new DefaultInput("tunein", "TuneIn"),
+    4: new DefaultInput("spotify", "Spotify"),
+    5: new DefaultInput("deezer", "Deezer"),
+    6: new DefaultInput("napster", "Napster"),
+    7: new DefaultInput("iheartradio", "iHeartRadio"),
+    8: new DefaultInput("siriusxm", "SiriusXM"),
+    9: new DefaultInput("soundcloud", "SoundCloud"),
+    10: new DefaultInput("tidal", "Tidal"),
+    12: new DefaultInput("rdio", "Rdio"),
+    13: new DefaultInput("amazonmusic", "Amazon Music"),
+    15: new DefaultInput("moodmix", "Mood Mix"),
+    16: new DefaultInput("juke", "Juke"),
+    18: new DefaultInput("qqmusic", "QQ Music"),
+    30: new DefaultInput("qobuz", "qobuz"),
+    1024: new DefaultInput("local", "Local Network"),
+    1025: new DefaultInput("heos_playlists", "HEOS Playlists"),
+    1026: new DefaultInput("heos_history", "HEOS History"),
+    1027: new DefaultInput("heos_auxinputs", "AUX Inputs"),
+    1028: new DefaultInput("heos_favorites", "HEOS Favorites"),
   } as const;
+
+  public static readonly INPUT_SOURCES = [
+    new DefaultInput("aux_in_1", "AUX In 1"),
+    new DefaultInput("aux_in_2", "AUX In 2"),
+    new DefaultInput("aux_in_3", "AUX In 3"),
+    new DefaultInput("aux_in_4", "AUX In 4"),
+    new DefaultInput("aux_single", "AUX Single"),
+    new DefaultInput("aux1", "AUX 1"),
+    new DefaultInput("aux2", "AUX 2"),
+    new DefaultInput("aux3", "AUX 3"),
+    new DefaultInput("aux4", "AUX 4"),
+    new DefaultInput("aux5", "AUX 5"),
+    new DefaultInput("aux6", "AUX 6"),
+    new DefaultInput("aux7", "AUX 7"),
+    new DefaultInput("aux_8k", "AUX 8K"),
+    new DefaultInput("line_in_1", "Line In 1"),
+    new DefaultInput("line_in_2", "Line In 2"),
+    new DefaultInput("line_in_3", "Line In 3"),
+    new DefaultInput("line_in_4", "Line In 4"),
+    new DefaultInput("coax_in_1", "Coax In 1"),
+    new DefaultInput("coax_in_2", "Coax In 2"),
+    new DefaultInput("optical_in_1", "Optical In 1"),
+    new DefaultInput("optical_in_2", "Optical In 2"),
+    new DefaultInput("optical_in_3", "Optical In 3"),
+    new DefaultInput("hdmi_in_1", "HDMI In 1"),
+    new DefaultInput("hdmi_in_2", "HDMI In 2"),
+    new DefaultInput("hdmi_in_3", "HDMI In 3"),
+    new DefaultInput("hdmi_in_4", "HDMI In 4"),
+    new DefaultInput("hdmi_arc_1", "HDMI ARC 1"),
+    new DefaultInput("cable_sat", "Cable/SAT"),
+    new DefaultInput("dvd", "DVD"),
+    new DefaultInput("bluray", "Blu-ray"),
+    new DefaultInput("game", "Game"),
+    new DefaultInput("game2", "Game 2"),
+    new DefaultInput("mediaplayer", "Media Player"),
+    new DefaultInput("cd", "CD"),
+    new DefaultInput("tuner", "Tuner"),
+    new DefaultInput("hdradio", "HD Radio"),
+    new DefaultInput("tvaudio", "TV Audio"),
+    new DefaultInput("phono", "Phono"),
+    new DefaultInput("usbdac", "USB DAC"),
+    new DefaultInput("analog_in_1", "Analog In 1"),
+    new DefaultInput("analog_in_2", "Analog In 2"),
+    new DefaultInput("recorder_in_1", "Recorder In 1"),
+    new DefaultInput("tv", "TV"),
+  ];
+
+  public static readonly DEFAULT_INPUT_SOURCES = [
+    ...Object.values(DenonClientHeosCli.HEOS_SOURCES),
+    ...DenonClientHeosCli.INPUT_SOURCES,
+    new DefaultInput("airplay", "AirPlay"),
+  ];
 
   private player_id: number | undefined;
 
@@ -204,6 +257,7 @@ export class DenonClientHeosCli extends DenonClient {
         response_separator: "\r\n",
         all_responses_to_generic: false,
       },
+      DenonClientHeosCli.DEFAULT_INPUT_SOURCES,
       debugLogCallback,
       powerUpdateCallback,
       muteUpdateCallback,
@@ -485,18 +539,22 @@ export class DenonClientHeosCli extends DenonClient {
     }
 
     let inputID;
-    if (payload.mid && typeof payload.mid === "string" && payload.mid.startsWith("inputs/")) {
-      inputID = payload.mid.substring(7);
+    if (payload.mid && typeof payload.mid === "string") {
+      if (payload.mid.startsWith("inputs/")) {
+        inputID = payload.mid.substring(7);
+      } else if (payload.mid.startsWith("cd/")) {
+        inputID = "cd";
+      }
     } else {
       const sid = Number(payload.sid) as keyof typeof DenonClientHeosCli.HEOS_SOURCES;
       if (sid in DenonClientHeosCli.HEOS_SOURCES) {
         if (payload.sid === 1024 && payload.album_id === "1") {
-          inputID = "AirPlay";
+          inputID = "airplay";
         } else {
-          inputID = DenonClientHeosCli.HEOS_SOURCES[sid];
+          inputID = DenonClientHeosCli.HEOS_SOURCES[sid].inputID;
         }
       } else {
-        inputID = "Unknown Input";
+        inputID = payload.sid.toString();
       }
     }
     return inputID;

@@ -14,6 +14,7 @@ interface IDenonClientConnectionParams {
 
 export interface IDenonClient {
   readonly serialNumber: string;
+  readonly defaultInputs: DefaultInput[];
 
   isConnected(): boolean;
   getPower(raceStatus?: RaceStatus): Promise<boolean>;
@@ -35,6 +36,7 @@ export interface IDenonClient {
 export abstract class DenonClient implements IDenonClient {
   public readonly serialNumber: string;
   public readonly params;
+  public readonly defaultInputs: DefaultInput[];
   private socket: net.Socket | undefined;
   private sendMutex;
   private dataEventMutex;
@@ -50,6 +52,7 @@ export abstract class DenonClient implements IDenonClient {
   constructor(
     serialNumber: string,
     params: IDenonClientConnectionParams,
+    defaultInputs: DefaultInput[] = [],
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
@@ -58,6 +61,7 @@ export abstract class DenonClient implements IDenonClient {
   ) {
     this.serialNumber = serialNumber;
     this.params = params;
+    this.defaultInputs = defaultInputs;
 
     this.socket = undefined;
     this.sendMutex = new Mutex();
@@ -316,6 +320,16 @@ export class RaceStatus {
 
   public setRaceOver() {
     this.running = false;
+  }
+}
+
+export class DefaultInput {
+  public readonly inputID: string;
+  public readonly displayName: string;
+
+  constructor(inputID: string, displayName: string) {
+    this.inputID = inputID;
+    this.displayName = displayName;
   }
 }
 

@@ -6,6 +6,7 @@ import * as DenonProtocol from "./denonProtocol.js";
 export class DenonClientHybrid implements IDenonClient {
   public readonly controlMode = DenonProtocol.ControlMode.HYBRID;
   public readonly serialNumber: string;
+  public readonly defaultInputs = DenonClientHeosCli.DEFAULT_INPUT_SOURCES;
 
   private readonly clientAvrControl;
   private readonly clientHeosCli;
