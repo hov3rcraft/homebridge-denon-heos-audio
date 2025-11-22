@@ -141,55 +141,43 @@ export class DenonClientHeosCli extends DenonClient {
         EXP_RES: /step=(\d+)/,
       },
     },
-    SOURCE: {
-      GET: {
-        COMMAND: "player/get_now_playing_media",
-        PARAMS: "?pid=[PID]",
-        EXP_RES: /sid=(\d+)/,
-      },
-      SET: {
-        COMMAND: "browse/play_input",
-        PARAMS: "?pid=[PID]&sid=[VALUE]",
-        EXP_RES: /sid=(\w+)/,
-      },
-    },
     INPUT: {
       GET: {
         COMMAND: "player/get_now_playing_media",
         PARAMS: "?pid=[PID]",
-        EXP_RES: /(album_id=inputs\/\w+)?/,
+        EXP_RES: /.*/,
       },
       SET: {
         COMMAND: "browse/play_input",
-        PARAMS: "?pid=[PID]&input=[VALUE]",
-        EXP_RES: /input=(\w+)/,
+        PARAMS: "?pid=[PID]&input=inputs/[VALUE]",
+        EXP_RES: /input=inputs\/(\w+)/,
       },
     },
   };
 
-  protected static readonly SOURCES: {
-    "sources/pandora": 1,
-    "sources/rhapsody": 2,
-    "sources/tunein": 3,
-    "sources/spotify": 4,
-    "sources/deezer": 5,
-    "sources/napster": 6,
-    "sources/iheartradio": 7,
-    "sources/siriusxm": 8,
-    "sources/soundcloud": 9,
-    "sources/tidal": 10,
-    "sources/rdio": 12,
-    "sources/amazonmusic": 13,
-    "sources/moodmix": 15,
-    "sources/juke": 16,
-    "sources/qqmusic": 18,
-    "sources/qobuz": 30,
-    "sources/local": 1024,
-    "sources/heos_playlists": 1025,
-    "sources/heos_history": 1026,
-    "sources/heos_auxinputs": 1027,
-    "sources/heos_favorites": 1028
-  }
+  protected static readonly HEOS_SOURCES = {
+    1: "Pandora",
+    2: "Rhapsody",
+    3: "TuneIn",
+    4: "Spotify",
+    5: "Deezer",
+    6: "Napster",
+    7: "iHeartRadio",
+    8: "SiriusXM",
+    9: "SoundCloud",
+    10: "Tidal",
+    12: "Rdio",
+    13: "Amazon Music",
+    15: "Mood Mix",
+    16: "Juke",
+    18: "QQ Music",
+    30: "qobuz",
+    1024: "Local Network",
+    1025: "HEOS Playlists",
+    1026: "HEOS History",
+    1027: "AUX Inputs",
+    1028: "HEOS Favorites",
+  } as const;
 
   private player_id: number | undefined;
 
@@ -478,11 +466,47 @@ export class DenonClientHeosCli extends DenonClient {
     });
   }
 
-  public getInput(): Promise<string> {
-    return Promise.resolve("NOT IMPLEMENTED"); // TODO
+  public async getInput(raceStatus?: RaceStatus): Promise<string> {
+    const payload_str = await this.sendCommand(DenonClientHeosCli.PROTOCOL.INPUT, CommandMode.GET, { passPayload: true });
+    const inputID = this.inputPayloadToInputID(payload_str);
+
+    if (raceStatus && !raceStatus.isRunning() && this.inputUpdateCallback) {
+      this.inputUpdateCallback(inputID);
+      this.debugLog(`getInput was late to the party [race id: ${raceStatus.raceId}].`);
+    }
+    console.log("getInput response:", inputID);
+    return inputID;
+  }
+
+  private inputPayloadToInputID(payload_str: string) {
+    const payload = JSON.parse(payload_str);
+    if (!payload.sid) {
+      throw new InvalidResponseException("Payload does not include sid!", undefined, payload_str);
+    }
+
+    let inputID;
+    if (payload.mid && typeof payload.mid === "string" && payload.mid.startsWith("inputs/")) {
+      inputID = payload.mid.substring(7);
+    } else {
+      const sid = Number(payload.sid) as keyof typeof DenonClientHeosCli.HEOS_SOURCES;
+      if (sid in DenonClientHeosCli.HEOS_SOURCES) {
+        if (payload.sid === 1024 && payload.album_id === "1") {
+          inputID = "AirPlay";
+        } else {
+          inputID = DenonClientHeosCli.HEOS_SOURCES[sid];
+        }
+      } else {
+        inputID = "Unknown Input";
+      }
+    }
+    return inputID;
   }
 
   public async setInput(inputID: string): Promise<string> {
-    return Promise.resolve("NOT IMPLEMENTED"); // TODO
+    const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.INPUT, CommandMode.SET, {
+      value: inputID,
+    });
+    console.log("setInput response:", response);
+    return response;
   }
 }

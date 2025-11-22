@@ -97,11 +97,11 @@ export class DenonClientHybrid implements IDenonClient {
     return this.clientHeosCli.setVolumeDown(volumeDecrement);
   }
 
-  public getInput(): Promise<string> {
-    return Promise.resolve("NOT IMPLEMENTED"); // TODO
+  public getInput(raceStatus?: RaceStatus): Promise<string> {
+    return this.clientHeosCli.getInput(raceStatus);
   }
 
   public async setInput(inputID: string): Promise<string> {
-    return Promise.resolve("NOT IMPLEMENTED"); // TODO
+    return this.clientHeosCli.setInput(inputID);
   }
 }

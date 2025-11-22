@@ -116,11 +116,6 @@ export class DenonAudioAccessory {
           continue;
         }
 
-        if (this.controlMode === DenonProtocol.ControlMode.HEOSCLI && !(/^(sources|inputs)\//.test(config_input.inputID))) {
-          log.warn(`In HeosCLI control mode, all inputs need to begin with either "inputs/" or "sources/". Input "${config_input.inputID}" does not. Skipping this input.`);
-          continue;
-        }
-
         const configured_input = new ConfiguredInput(config_input.inputID, config_input.name, config.showInList, i, true);
         this.configuredInputsByInputId.set(config_input.inputID, configured_input);
         this.configuredInputsByIdentifier.set(i, configured_input);
@@ -129,7 +124,7 @@ export class DenonAudioAccessory {
           this.accessory.getService(`${this.name} Input ${configured_input.inputID}`) ||
           this.accessory.addService(this.platform.Service.InputSource, `${this.name} Input ${configured_input.inputID}`, configured_input.inputID);
         inputService.setCharacteristic(this.platform.Characteristic.Identifier, i);
-        inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, config_input.inputID);
+        inputService.setCharacteristic(this.platform.Characteristic.ConfiguredName, configured_input.displayName);
         inputService.setCharacteristic(this.platform.Characteristic.InputSourceType, this.platform.Characteristic.InputSourceType.OTHER);
         inputService.setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED);
         inputService.setCharacteristic(
