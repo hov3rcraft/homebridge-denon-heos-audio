@@ -123,8 +123,8 @@ export class DenonClientHeosCli extends DenonClient {
         PARAMS: "?pid=[PID]&level=[VALUE]",
         EXP_RES: /level=(\d+)/,
       },
-      COMMAND: {
-        EVENT: "event/player_volume_changed",
+      EVENT: {
+        COMMAND: "event/player_volume_changed",
         EXP_RES: /level=(\d+)/,
       },
     },
@@ -152,6 +152,10 @@ export class DenonClientHeosCli extends DenonClient {
         COMMAND: "browse/play_input",
         PARAMS: "?pid=[PID]&input=inputs/[VALUE]",
         EXP_RES: /input=inputs\/(\w+)/,
+      },
+      EVENT: {
+        COMMAND: "event/player_now_playing_changed",
+        EXP_RES: /.*/,
       }, // TODO implement change event
     },
   };
@@ -431,15 +435,27 @@ export class DenonClientHeosCli extends DenonClient {
     }
 
     // Volume
-    if (r_obj.heos.command === DenonClientHeosCli.PROTOCOL.VOLUME.COMMAND.EVENT) {
-      const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.VOLUME.COMMAND.EXP_RES);
+    if (r_obj.heos.command === DenonClientHeosCli.PROTOCOL.VOLUME.EVENT.COMMAND) {
+      const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.VOLUME.EVENT.EXP_RES);
 
       if (!match) {
-        throw new InvalidResponseException("Unexpected volume level", [DenonClientHeosCli.PROTOCOL.VOLUME.COMMAND.EXP_RES.toString()], r_obj.heos.message);
+        throw new InvalidResponseException("Unexpected volume level", [DenonClientHeosCli.PROTOCOL.VOLUME.EVENT.EXP_RES.toString()], r_obj.heos.message);
       }
 
       if (this.volumeUpdateCallback) {
         this.volumeUpdateCallback(Number(match[1]));
+      }
+    }
+
+    // Input
+    if (r_obj.heos.command === DenonClientHeosCli.PROTOCOL.INPUT.EVENT.COMMAND) {
+      // 'now playing changed' only gives us an indication that something has changed, but no information on what has changed.
+      // Therefore, we need to actively query the current input.
+      if (this.inputUpdateCallback) {
+        this.sendCommand(DenonClientHeosCli.PROTOCOL.INPUT, CommandMode.GET, { passPayload: true }).then((payload_str) => {
+          const inputID = DenonClientHeosCli.inputPayloadToInputID(payload_str);
+          this.inputUpdateCallback!(inputID);
+        });
       }
     }
   }
