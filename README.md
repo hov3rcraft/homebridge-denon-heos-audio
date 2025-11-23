@@ -6,7 +6,7 @@ This plugin is especially useful for controlling smart speakers and stereos, whi
 
 ## Pre-Release
 
-This is an early pre-release. Please only install the plugin at this point if you are willing to live with a few bugs and crashes. Running it on a child bridge is highly recommended.
+This is a pre-release. Please only install the plugin at this point if you are willing to live with a few bugs and crashes. Running it on a child bridge is highly recommended.
 
 Bug reports and feature suggestions are welcome, please head to the [issues](https://github.com/hov3rcraft/homebridge-denon-heos-audio/issues) page!
 
@@ -22,9 +22,8 @@ I am using the following devices for testing:
 
 ## Roadmap
 
-I am planning to continue development over the course of 2025. Up next:
+I am planning to continue development over the coming months. Up next:
 
-- Input selection
 - robust handling of offline devices and disconnected devices
 - device auto-discovery when IP is not static and/or control protocol is not set
 
