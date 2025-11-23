@@ -563,7 +563,6 @@ export class DenonClientHeosCli extends DenonClient {
     const response = await this.sendCommand(DenonClientHeosCli.PROTOCOL.INPUT, CommandMode.SET, {
       value: inputID,
     });
-    console.log("setInput response:", response); // TODO check
     return response;
   }
 }
