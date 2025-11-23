@@ -98,7 +98,7 @@ export class DenonClientHeosCli extends DenonClient {
         EXP_RES: /state=(\w+)/,
       },
       EVENT: {
-        EVENT: "event/player_volume_changed",
+        COMMAND: "event/player_volume_changed",
         EXP_RES: /mute=(\w+)/,
       },
       VALUES: {
@@ -123,7 +123,7 @@ export class DenonClientHeosCli extends DenonClient {
         PARAMS: "?pid=[PID]&level=[VALUE]",
         EXP_RES: /level=(\d+)/,
       },
-      EVENT: {
+      COMMAND: {
         EVENT: "event/player_volume_changed",
         EXP_RES: /level=(\d+)/,
       },
@@ -311,7 +311,7 @@ export class DenonClientHeosCli extends DenonClient {
     { value, passPayload = false }: { value?: string; passPayload?: boolean }
   ): Promise<string> {
     if (!this.player_id) {
-      this.findPlayerId();
+      await this.findPlayerId();
     }
     return super.sendCommand(command, commandMode, { pid: this.player_id, value: value, passPayload: passPayload });
   }
@@ -329,13 +329,13 @@ export class DenonClientHeosCli extends DenonClient {
     }
 
     if (this.responseCallback && this.responseCallback.command === r_obj.heos.command.trim()) {
-      let out: string | undefined = undefined;
       if (r_obj.heos.success !== undefined && r_obj.heos.success !== "success") {
         const error = new CommandFailedException(this.responseCallback.command);
         this.responseCallback = undefined;
         throw error;
       }
 
+      let out: string | undefined = undefined;
       const pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
       if (!pid_match || Number(pid_match[1]) === this.player_id) {
         const message_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
@@ -401,6 +401,45 @@ export class DenonClientHeosCli extends DenonClient {
 
       if (this.powerUpdateCallback) {
         this.powerUpdateCallback(isPlaying[mappedValue as Playing]);
+      }
+    }
+
+    // Mute
+    if (r_obj.heos.command === DenonClientHeosCli.PROTOCOL.MUTE.EVENT.COMMAND) {
+      const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.MUTE.EVENT.EXP_RES);
+
+      if (!match) {
+        throw new InvalidResponseException(
+          "Unexpected mute state",
+          Object.values(DenonClientHeosCli.PROTOCOL.MUTE.VALUES).map((value) => value.VALUE),
+          r_obj.heos.message
+        );
+      }
+
+      const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.MUTE.VALUES, match[1]);
+      if (mappedValue === undefined) {
+        throw new InvalidResponseException(
+          "Unexpected mute state",
+          Object.values(DenonClientHeosCli.PROTOCOL.MUTE.VALUES).map((value) => value.VALUE),
+          r_obj.heos.message
+        );
+      }
+
+      if (this.muteUpdateCallback) {
+        this.muteUpdateCallback(mappedValue);
+      }
+    }
+
+    // Volume
+    if (r_obj.heos.command === DenonClientHeosCli.PROTOCOL.VOLUME.COMMAND.EVENT) {
+      const match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.VOLUME.COMMAND.EXP_RES);
+
+      if (!match) {
+        throw new InvalidResponseException("Unexpected volume level", [DenonClientHeosCli.PROTOCOL.VOLUME.COMMAND.EXP_RES.toString()], r_obj.heos.message);
+      }
+
+      if (this.volumeUpdateCallback) {
+        this.volumeUpdateCallback(Number(match[1]));
       }
     }
   }
