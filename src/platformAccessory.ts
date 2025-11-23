@@ -7,7 +7,6 @@ import { PromiseTimeoutException } from "./promiseTimeoutException.js";
 import { IDenonClient, Playing, RaceStatus } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 import * as CustomLogging from "./customLogging.js";
-import internal from "stream";
 
 /**
  * Platform Accessory
@@ -250,7 +249,7 @@ export class DenonAudioAccessory {
     this.log.debug(`getActiveIdentifier for ${this.name}. [race id: ${raceStatus.raceId}]`);
 
     try {
-      let current_input = await Promise.race([
+      const current_input = await Promise.race([
         this.denonClient.getInput(raceStatus),
         new Promise<string>((resolve, reject) => {
           setTimeout(() => {
