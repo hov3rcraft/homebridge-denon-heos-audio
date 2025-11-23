@@ -561,7 +561,7 @@ export class DenonClientHeosCli extends DenonClient {
 
   public async getInput(raceStatus?: RaceStatus): Promise<string> {
     const payload_str = await this.sendCommand(DenonClientHeosCli.PROTOCOL.INPUT, CommandMode.GET, { passPayload: true });
-    const inputID = this.inputPayloadToInputID(payload_str);
+    const inputID = DenonClientHeosCli.inputPayloadToInputID(payload_str);
 
     if (raceStatus && !raceStatus.isRunning() && this.inputUpdateCallback) {
       this.inputUpdateCallback(inputID);
@@ -570,32 +570,30 @@ export class DenonClientHeosCli extends DenonClient {
     return inputID;
   }
 
-  private inputPayloadToInputID(payload_str: string) {
+  private static inputPayloadToInputID(payload_str: string) {
     const payload = JSON.parse(payload_str);
     if (!payload.sid) {
       throw new InvalidResponseException("Payload does not include sid!", undefined, payload_str);
     }
 
-    let inputID;
     if (payload.mid && typeof payload.mid === "string") {
       if (payload.mid.startsWith("inputs/")) {
-        inputID = payload.mid.substring(7);
+        return payload.mid.substring(7);
       } else if (payload.mid.startsWith("cd/")) {
-        inputID = "cd";
-      }
-    } else {
-      const sid = Number(payload.sid) as keyof typeof DenonClientHeosCli.HEOS_SOURCES;
-      if (sid in DenonClientHeosCli.HEOS_SOURCES) {
-        if (payload.sid === 1024 && payload.album_id === "1") {
-          inputID = "airplay";
-        } else {
-          inputID = DenonClientHeosCli.HEOS_SOURCES[sid].inputID;
-        }
-      } else {
-        inputID = payload.sid.toString();
+        return "cd";
       }
     }
-    return inputID;
+
+    const sid = Number(payload.sid) as keyof typeof DenonClientHeosCli.HEOS_SOURCES;
+    if (sid in DenonClientHeosCli.HEOS_SOURCES) {
+      if (payload.sid === 1024 && payload.album_id === "1") {
+        return "airplay";
+      } else {
+        return DenonClientHeosCli.HEOS_SOURCES[sid].inputID;
+      }
+    }
+
+    return payload.sid.toString();
   }
 
   public async setInput(inputID: string): Promise<string> {
