@@ -328,7 +328,7 @@ export class DenonClientHeosCli extends DenonClient {
       throw new InvalidResponseException("Received a response that is not valid JSON!", undefined, response);
     }
 
-    if (r_obj.heos === undefined || r_obj.heos.message === undefined) {
+    if (r_obj.heos === undefined || r_obj.heos.command === undefined) {
       throw new InvalidResponseException("Received response that does not follow HeosCLI specifications", undefined, response);
     }
 
@@ -339,27 +339,31 @@ export class DenonClientHeosCli extends DenonClient {
         throw error;
       }
 
-      let out: string | undefined = undefined;
-      const pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
-      if (!pid_match || Number(pid_match[1]) === this.player_id) {
-        const message_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
-        if (message_match) {
-          out = message_match.length > 1 ? message_match[1] : r_obj.heos.message;
-        }
-      }
-
-      if (out !== undefined) {
-        if (this.responseCallback.passPayload) {
-          if (r_obj.payload === undefined) {
-            throw new InvalidResponseException("Received a response does not include a payload!");
+      if (r_obj.heos.message !== undefined) {
+        let out: string | undefined = undefined;
+        const pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
+        if (!pid_match || Number(pid_match[1]) === this.player_id) {
+          const message_match = r_obj.heos.message.match(this.responseCallback.expectedResponse);
+          if (message_match) {
+            out = message_match.length > 1 ? message_match[1] : r_obj.heos.message;
           }
-          out = JSON.stringify(r_obj.payload);
         }
-        this.debugLog("Received response:", response);
 
-        this.responseCallback.callback(out);
-        this.responseCallback = undefined;
-        if (this.params.all_responses_to_generic) {
+        if (out !== undefined) {
+          if (this.responseCallback.passPayload) {
+            if (r_obj.payload === undefined) {
+              throw new InvalidResponseException("Received a response does not include a payload!");
+            }
+            out = JSON.stringify(r_obj.payload);
+          }
+          this.debugLog("Received response:", response);
+
+          this.responseCallback.callback(out);
+          this.responseCallback = undefined;
+          if (this.params.all_responses_to_generic) {
+            this.genericResponseHandler(r_obj);
+          }
+        } else {
           this.genericResponseHandler(r_obj);
         }
       } else {
