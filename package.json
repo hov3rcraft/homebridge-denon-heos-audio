@@ -2,7 +2,7 @@
   "name": "homebridge-denon-heos-audio",
   "displayName": "Homebridge Denon Heos Audio",
   "type": "module",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Control your Denon speakers via AVR Control and/or HeosCLI",
   "author": "hov3rcraft",
   "license": "MIT",
