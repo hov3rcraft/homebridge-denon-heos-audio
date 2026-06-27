@@ -1,4 +1,13 @@
-import { CommandMode, DefaultInput, DenonClient, findMapByValue, findValueByMap, InvalidResponseException, Playing } from "./denonClient.js";
+import {
+  CommandMode,
+  ConnectionTimeoutException,
+  DefaultInput,
+  DenonClient,
+  findMapByValue,
+  findValueByMap,
+  InvalidResponseException,
+  Playing,
+} from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 
 export class DenonClientAvrControl extends DenonClient {
@@ -120,6 +129,7 @@ export class DenonClientAvrControl extends DenonClient {
 
   constructor(
     serialNumber: string,
+    name: string,
     host: string,
     connect_timeout: number,
     response_timeout: number,
@@ -127,10 +137,11 @@ export class DenonClientAvrControl extends DenonClient {
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
     volumeUpdateCallback?: (volume: number) => void,
-    inputUpdateCallback?: (input: string) => void
+    inputUpdateCallback?: (input: string) => void,
   ) {
     super(
       serialNumber,
+      name,
       {
         host: host,
         port: DenonProtocol.ControlMode.AVRCONTROL,
@@ -146,10 +157,16 @@ export class DenonClientAvrControl extends DenonClient {
       powerUpdateCallback,
       muteUpdateCallback,
       volumeUpdateCallback,
-      inputUpdateCallback
+      inputUpdateCallback,
     );
 
-    this.connect();
+    this.connect().catch((error) => {
+      if (error instanceof ConnectionTimeoutException) {
+        this.debugLog("Error connecting client '", this.name, "' at ", this.params.host, ":", this.params.port, " - ", error);
+      } else {
+        throw error;
+      }
+    });
   }
 
   protected async subscribeToChangeEvents(): Promise<void> {
@@ -192,7 +209,7 @@ export class DenonClientAvrControl extends DenonClient {
         throw new InvalidResponseException(
           "Unexpected power state",
           Object.values(DenonClientAvrControl.PROTOCOL.POWER.VALUES).map((value) => value.VALUE),
-          match[1]
+          match[1],
         );
       }
 
@@ -210,7 +227,7 @@ export class DenonClientAvrControl extends DenonClient {
         throw new InvalidResponseException(
           "Unexpected mute state",
           Object.values(DenonClientAvrControl.PROTOCOL.MUTE.VALUES).map((value) => value.VALUE),
-          match[1]
+          match[1],
         );
       }
 

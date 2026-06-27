@@ -14,6 +14,7 @@ interface IDenonClientConnectionParams {
 
 export interface IDenonClient {
   readonly serialNumber: string;
+  readonly name: string;
   readonly defaultInputs: DefaultInput[];
 
   isConnected(): boolean;
@@ -35,6 +36,7 @@ export interface IDenonClient {
 
 export abstract class DenonClient implements IDenonClient {
   public readonly serialNumber: string;
+  public readonly name: string;
   public readonly params;
   public readonly defaultInputs: DefaultInput[];
   private socket: net.Socket | undefined;
@@ -51,6 +53,7 @@ export abstract class DenonClient implements IDenonClient {
 
   constructor(
     serialNumber: string,
+    name: string,
     params: IDenonClientConnectionParams,
     defaultInputs: DefaultInput[] = [],
     debugLogCallback?: (message: string, ...parameters: any[]) => void,
@@ -60,6 +63,7 @@ export abstract class DenonClient implements IDenonClient {
     inputUpdateCallback?: (input: string) => void,
   ) {
     this.serialNumber = serialNumber;
+    this.name = name;
     this.params = params;
     this.defaultInputs = defaultInputs;
 
@@ -89,67 +93,80 @@ export abstract class DenonClient implements IDenonClient {
   }
 
   protected async connectUnchecked(): Promise<void> {
-    // Connect
-    let newSocket: net.Socket | undefined = undefined;
+    this.debugLog("Establishing new connection...");
+    this.pendingData = "";
+    this.responseCallback = undefined;
+
+    let newSocket: net.Socket | undefined;
     try {
-      this.debugLog("Establishing new connection...");
-      this.pendingData = "";
-      this.responseCallback = undefined;
       newSocket = await new Promise<net.Socket>((resolve, reject) => {
-        newSocket = net.createConnection(
-          {
-            host: this.params.host,
-            port: this.params.port,
-            timeout: 0, // no timeout
-          },
-          () => {
-            this.debugLog("New connection established.");
-            resolve(newSocket!);
-          },
-        );
-
-        // Listen for connection closure events
-        newSocket.on("timeout", () => {
-          // TODO - right now we do not have client-side timeouts
-          this.socket = undefined;
-        });
-        newSocket.on("close", () => {
-          this.debugLog("Connection has closed.");
-          newSocket?.destroy();
-          this.socket = undefined;
-        });
-        newSocket.on("error", (error) => {
-          this.debugLog("Received an error from the server.", error);
-          newSocket?.end();
-          setTimeout(() => {
-            // give the server 2 seconds to gracefully close the connection, then force the issue
-            if (!newSocket?.destroyed) {
-              this.debugLog("Connection destroyed.");
-              newSocket?.destroy();
-            }
-          }, 2000);
-          this.socket = undefined;
-          reject(error);
+        const socket = net.createConnection({
+          host: this.params.host,
+          port: this.params.port,
+          timeout: 0, // no client-side idle timeout
         });
 
-        // Listen for responses
-        newSocket.on("data", (data) => {
-          this.dataHandler(data);
-        });
-
-        setTimeout(() => {
+        // No reply at all (device off, SYN dropped) -> this is what fires.
+        const connectTimer = setTimeout(() => {
+          cleanup();
+          socket.destroy();
           reject(new ConnectionTimeoutException(this.params));
         }, this.params.connect_timeout);
-      });
-      this.socket = newSocket;
 
+        const cleanup = () => {
+          clearTimeout(connectTimer);
+          socket.removeListener("connect", onConnect);
+          socket.removeListener("error", onError);
+        };
+
+        const onConnect = () => {
+          cleanup();
+          this.debugLog("New connection established.");
+          resolve(socket);
+        };
+
+        const onError = (error: NodeJS.ErrnoException) => {
+          cleanup();
+          socket.destroy();
+          // Host/network unreachable == device is off. Fold into the same exception.
+          if (error.code === "EHOSTUNREACH" || error.code === "ENETUNREACH" || error.code === "ETIMEDOUT" || error.code === "ECONNREFUSED") {
+            this.debugLog(`Device unreachable (${error.code}).`);
+            reject(new ConnectionTimeoutException(this.params));
+          } else {
+            reject(error);
+          }
+        };
+
+        socket.once("connect", onConnect);
+        socket.once("error", onError);
+      });
+
+      // Long-lived handlers, only after we truly have a connection.
+      newSocket.on("timeout", () => {
+        // client-side idle timeout, not a response timeout.
+        this.debugLog("Connection timed out (client-side, idle).");
+        this.socket = undefined;
+        newSocket?.destroy();
+      });
+      newSocket.on("close", () => {
+        this.debugLog("Connection has closed.");
+        this.socket = undefined;
+      });
+      newSocket.on("error", (error) => {
+        this.debugLog("Socket error after connect:", error.message);
+        this.socket = undefined;
+        newSocket?.destroy();
+      });
+      newSocket.on("data", (data) => this.dataHandler(data));
+
+      this.socket = newSocket;
       await this.subscribeToChangeEvents();
     } catch (error) {
-      if (newSocket) {
+      if (newSocket && !newSocket.destroyed) {
         this.debugLog("Destroying socket.");
-        newSocket!.destroy(); // Destroy the connection attempt
+        newSocket.destroy();
       }
-      this.debugLog("Catching and throwing:", error);
+      this.debugLog("Catching and throwing:", error instanceof Error ? error.message : error);
       throw error;
     }
   }

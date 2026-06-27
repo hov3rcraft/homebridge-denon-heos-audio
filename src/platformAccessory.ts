@@ -110,6 +110,7 @@ export class DenonAudioAccessory {
     // choose appropriate client
     this.denonClient = new DenonProtocol.CLIENT_MAP[this.controlMode](
       this.serialNumber,
+      this.name,
       this.ip,
       DenonAudioAccessory.API_CONNECT_TIMEOUT,
       DenonAudioAccessory.API_RESPONSE_TIMEOUT,

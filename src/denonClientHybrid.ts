@@ -6,6 +6,7 @@ import * as DenonProtocol from "./denonProtocol.js";
 export class DenonClientHybrid implements IDenonClient {
   public readonly controlMode = DenonProtocol.ControlMode.HYBRID;
   public readonly serialNumber: string;
+  public readonly name: string;
   public readonly defaultInputs = DenonClientHeosCli.DEFAULT_INPUT_SOURCES;
 
   private readonly clientAvrControl;
@@ -13,6 +14,7 @@ export class DenonClientHybrid implements IDenonClient {
 
   constructor(
     serialNumber: string,
+    name: string,
     host: string,
     connect_timeout: number,
     response_timeout: number,
@@ -20,20 +22,22 @@ export class DenonClientHybrid implements IDenonClient {
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
     volumeUpdateCallback?: (volume: number) => void,
-    inputUpdateCallback?: (input: string) => void
+    inputUpdateCallback?: (input: string) => void,
   ) {
     this.clientAvrControl = new DenonClientAvrControl(
       serialNumber,
+      name,
       host,
       connect_timeout,
       response_timeout,
       debugLogCallback,
       powerUpdateCallback,
       undefined,
-      undefined
+      undefined,
     );
     this.clientHeosCli = new DenonClientHeosCli(
       serialNumber,
+      name,
       host,
       connect_timeout,
       response_timeout,
@@ -41,9 +45,10 @@ export class DenonClientHybrid implements IDenonClient {
       undefined,
       muteUpdateCallback,
       volumeUpdateCallback,
-      inputUpdateCallback
+      inputUpdateCallback,
     );
     this.serialNumber = serialNumber;
+    this.name = name;
   }
 
   public isConnected(): boolean {

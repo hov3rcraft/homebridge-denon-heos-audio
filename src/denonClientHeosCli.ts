@@ -1,6 +1,7 @@
 import {
   CommandFailedException,
   CommandMode,
+  ConnectionTimeoutException,
   DefaultInput,
   DenonClient,
   findMapByValue,
@@ -240,6 +241,7 @@ export class DenonClientHeosCli extends DenonClient {
 
   constructor(
     serialNumber: string,
+    name: string,
     host: string,
     connect_timeout: number,
     response_timeout: number,
@@ -247,10 +249,11 @@ export class DenonClientHeosCli extends DenonClient {
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
     volumeUpdateCallback?: (volume: number) => void,
-    inputUpdateCallback?: (input: string) => void
+    inputUpdateCallback?: (input: string) => void,
   ) {
     super(
       serialNumber,
+      name,
       {
         host: host,
         port: DenonProtocol.ControlMode.HEOSCLI,
@@ -266,11 +269,17 @@ export class DenonClientHeosCli extends DenonClient {
       powerUpdateCallback,
       muteUpdateCallback,
       volumeUpdateCallback,
-      inputUpdateCallback
+      inputUpdateCallback,
     );
 
     this.player_id = undefined;
-    this.findPlayerId();
+    this.findPlayerId().catch((error) => {
+      if (error instanceof ConnectionTimeoutException) {
+        this.debugLog("Error connecting client '", this.name, "' at ", this.params.host, ":", this.params.port, " - ", error);
+      } else {
+        throw error;
+      }
+    });
   }
 
   private async findPlayerId() {
@@ -291,7 +300,7 @@ export class DenonClientHeosCli extends DenonClient {
   protected async subscribeToChangeEvents(): Promise<void> {
     const commandStr = (DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND + DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.PARAMS).replace(
       "[VALUE]",
-      DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES.ON.VALUE
+      DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES.ON.VALUE,
     );
     const response = await this.sendUnchecked(commandStr, DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.COMMAND, DenonClientHeosCli.PROTOCOL.EVENT_SUB.SET.EXP_RES);
     const mappedValue = findMapByValue(DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES, response);
@@ -300,7 +309,7 @@ export class DenonClientHeosCli extends DenonClient {
       throw new InvalidResponseException(
         "No valid response!",
         Object.values(DenonClientHeosCli.PROTOCOL.EVENT_SUB.VALUES).map((value) => value.VALUE),
-        response
+        response,
       );
     }
 
@@ -312,7 +321,7 @@ export class DenonClientHeosCli extends DenonClient {
   protected async sendCommand(
     command: any,
     commandMode: CommandMode,
-    { value, passPayload = false }: { value?: string; passPayload?: boolean }
+    { value, passPayload = false }: { value?: string; passPayload?: boolean },
   ): Promise<string> {
     if (!this.player_id) {
       await this.findPlayerId();
@@ -379,6 +388,10 @@ export class DenonClientHeosCli extends DenonClient {
       return; // not an event
     }
 
+    if (!r_obj.heos.message) {
+      return; // global events not concerned without a particular player id are not handled
+    }
+
     const pid_match = r_obj.heos.message.match(DenonClientHeosCli.PROTOCOL.PID_REGEX);
     if (!pid_match || Number(pid_match[1]) !== this.player_id) {
       return; // not this player
@@ -394,7 +407,7 @@ export class DenonClientHeosCli extends DenonClient {
         throw new InvalidResponseException(
           "Unexpected play state",
           Object.values(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES).map((value) => value.VALUE),
-          r_obj.heos.message
+          r_obj.heos.message,
         );
       }
 
@@ -403,7 +416,7 @@ export class DenonClientHeosCli extends DenonClient {
         throw new InvalidResponseException(
           "Unexpected play state",
           Object.values(DenonClientHeosCli.PROTOCOL.PLAY_STATE.VALUES).map((value) => value.VALUE),
-          r_obj.heos.message
+          r_obj.heos.message,
         );
       }
 
@@ -420,7 +433,7 @@ export class DenonClientHeosCli extends DenonClient {
         throw new InvalidResponseException(
           "Unexpected mute state",
           Object.values(DenonClientHeosCli.PROTOCOL.MUTE.VALUES).map((value) => value.VALUE),
-          r_obj.heos.message
+          r_obj.heos.message,
         );
       }
 
@@ -429,7 +442,7 @@ export class DenonClientHeosCli extends DenonClient {
         throw new InvalidResponseException(
           "Unexpected mute state",
           Object.values(DenonClientHeosCli.PROTOCOL.MUTE.VALUES).map((value) => value.VALUE),
-          r_obj.heos.message
+          r_obj.heos.message,
         );
       }
 

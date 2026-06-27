@@ -15,6 +15,7 @@ export const CLIENT_MAP: Record<
   ControlMode,
   new (
     serialNumber: string,
+    name: string,
     host: string,
     connect_timeout: number,
     response_timeout: number,
@@ -22,7 +23,7 @@ export const CLIENT_MAP: Record<
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
     volumeUpdateCallback?: (volume: number) => void,
-    inputUpdateCallback?: (input: string) => void
+    inputUpdateCallback?: (input: string) => void,
   ) => IDenonClient
 > = {
   [ControlMode.AVRCONTROL]: DenonClientAvrControl,
