@@ -117,7 +117,7 @@ export class DenonAudioAccessory {
       this.callbackActive.bind(this),
       this.callbackMute.bind(this),
       this.callbackVolume.bind(this),
-      this.callbackInput.bind(this)
+      this.callbackInput.bind(this),
     );
 
     // specify inputs to add
@@ -166,7 +166,7 @@ export class DenonAudioAccessory {
       inputService.setCharacteristic(this.platform.Characteristic.IsConfigured, this.platform.Characteristic.IsConfigured.CONFIGURED);
       inputService.setCharacteristic(
         this.platform.Characteristic.CurrentVisibilityState,
-        configured_input.showInList ? this.platform.Characteristic.CurrentVisibilityState.SHOWN : this.platform.Characteristic.CurrentVisibilityState.HIDDEN
+        configured_input.showInList ? this.platform.Characteristic.CurrentVisibilityState.SHOWN : this.platform.Characteristic.CurrentVisibilityState.HIDDEN,
       );
       this.tvService.addLinkedService(inputService);
       this.inputServices.push(inputService);
@@ -174,7 +174,7 @@ export class DenonAudioAccessory {
       log.debug(
         `Added ${configured_input.userDefined ? "user-defined" : "default"} input service for input ID ${configured_input.inputID} with identifier ${
           configured_input.identifier
-        }.`
+        }.`,
       );
     }
 
@@ -194,11 +194,11 @@ export class DenonAudioAccessory {
 
           this.informationService.setCharacteristic(
             this.platform.Characteristic.Manufacturer,
-            xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("manufacturer")[0]?.textContent || "unknown"
+            xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("manufacturer")[0]?.textContent || "unknown",
           );
           this.informationService.setCharacteristic(
             this.platform.Characteristic.Model,
-            xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("modelName")[0]?.textContent || "unknown"
+            xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("modelName")[0]?.textContent || "unknown",
           );
 
           const d_list = xmlDoc.getElementsByTagName("device")[0]?.getElementsByTagName("deviceList")[0]?.getElementsByTagName("device") || [];
@@ -639,7 +639,11 @@ export class DenonAudioAccessory {
       if (this.lastSetVolume && this.adjustToVolumeLimit(this.lastSetVolume) === volume) {
         return this.lastSetVolume;
       } else {
-        return Math.round((volume / this.volumeLimit) * 100);
+        let adjustedVolume = Math.round((volume / this.volumeLimit) * 100);
+        if (adjustedVolume > 100) {
+          adjustedVolume = 100;
+        }
+        return adjustedVolume;
       }
     } else {
       return volume;
