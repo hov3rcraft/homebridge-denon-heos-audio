@@ -4,7 +4,7 @@ import type { DenonAudioPlatform } from "./platform.js";
 
 import { DOMParser } from "@xmldom/xmldom";
 import { PromiseTimeoutException } from "./promiseTimeoutException.js";
-import { IDenonClient, Playing, RaceStatus } from "./denonClient.js";
+import { IDenonClient, Playing, RaceStatus, ResponseTimeoutException } from "./denonClient.js";
 import * as DenonProtocol from "./denonProtocol.js";
 import * as CustomLogging from "./customLogging.js";
 
@@ -237,6 +237,8 @@ export class DenonAudioAccessory {
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getActive(). [race id: ${raceStatus.raceId}]`);
+      } else if (error instanceof ResponseTimeoutException) {
+        this.log.debug(`${this.name} response timed out for getActive(). [race id: ${raceStatus.raceId}]`, error);
       } else {
         this.log.error(`An error occured while getting power status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
@@ -262,6 +264,8 @@ export class DenonAudioAccessory {
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getActiveIdentifier(). [race id: ${raceStatus.raceId}]`);
+      } else if (error instanceof ResponseTimeoutException) {
+        this.log.debug(`${this.name} response timed out for getActiveIdentifier(). [race id: ${raceStatus.raceId}]`, error);
       } else {
         this.log.error(`An error occured while getting current input for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
@@ -283,6 +287,8 @@ export class DenonAudioAccessory {
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getPlaying(). [race id: ${raceStatus.raceId}]`);
+      } else if (error instanceof ResponseTimeoutException) {
+        this.log.debug(`${this.name} response timed out for getPlaying(). [race id: ${raceStatus.raceId}]`, error);
       } else {
         this.log.error(`An error occured while getting playing status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
@@ -342,6 +348,8 @@ export class DenonAudioAccessory {
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getMute(). [race id: ${raceStatus.raceId}]`);
+      } else if (error instanceof ResponseTimeoutException) {
+        this.log.debug(`${this.name} response timed out for getMute(). [race id: ${raceStatus.raceId}]`, error);
       } else {
         this.log.error(`An error occured while getting mute status for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
@@ -367,6 +375,8 @@ export class DenonAudioAccessory {
     } catch (error) {
       if (error instanceof PromiseTimeoutException) {
         this.log.debug(`${this.name} lost its promise race for getVolume(). [race id: ${raceStatus.raceId}]`);
+      } else if (error instanceof ResponseTimeoutException) {
+        this.log.debug(`${this.name} response timed out for getVolume(). [race id: ${raceStatus.raceId}]`, error);
       } else {
         this.log.error(`An error occured while getting volume for ${this.name}. [race id: ${raceStatus.raceId}]`, error);
       }
