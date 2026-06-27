@@ -84,8 +84,12 @@
             },
             "inputs": {
               "title": "Inputs",
-              "description": "The list of inputs to your device.",
+              "description": "The list of inputs to your device. If you configure inputs here, those inputs will become selectable in the Home app.",
               "type": "array",
+              "required": false,
+              "default": [],
+              "listItems": 0,
+              "minItems": 0,
               "items": {
                 "type": "object",
                 "properties": {

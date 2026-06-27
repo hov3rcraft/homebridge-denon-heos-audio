@@ -57,7 +57,7 @@ export abstract class DenonClient implements IDenonClient {
     powerUpdateCallback?: (power: boolean) => void,
     muteUpdateCallback?: (mute: boolean) => void,
     volumeUpdateCallback?: (volume: number) => void,
-    inputUpdateCallback?: (input: string) => void
+    inputUpdateCallback?: (input: string) => void,
   ) {
     this.serialNumber = serialNumber;
     this.params = params;
@@ -105,7 +105,7 @@ export abstract class DenonClient implements IDenonClient {
           () => {
             this.debugLog("New connection established.");
             resolve(newSocket!);
-          }
+          },
         );
 
         // Listen for connection closure events
@@ -159,7 +159,7 @@ export abstract class DenonClient implements IDenonClient {
   protected async sendCommand(
     command: any,
     commandMode: CommandMode,
-    { pid, value, passPayload = false }: { value?: string; pid?: number; passPayload?: boolean }
+    { pid, value, passPayload = false }: { value?: string; pid?: number; passPayload?: boolean },
   ): Promise<string> {
     const specCommand = command[CommandMode[commandMode]];
     let commandStr = specCommand.COMMAND;
@@ -183,7 +183,7 @@ export abstract class DenonClient implements IDenonClient {
           throw new InvalidResponseException(
             `Unexpected response for command ${commandStr}`,
             Object.values(command.VALUES).map((value: any) => value.VALUE),
-            response
+            response,
           );
         }
       }
@@ -216,7 +216,7 @@ export abstract class DenonClient implements IDenonClient {
           },
           rawCommand ?? command,
           expectedResponse,
-          passPayload
+          passPayload,
         );
         this.socket!.write(fullCommand + this.params.command_separator);
         setTimeout(() => {
