@@ -2,7 +2,7 @@
   "name": "homebridge-denon-heos-audio",
   "displayName": "Homebridge Denon Heos Audio",
   "type": "module",
-  "version": "0.4.2",
+  "version": "0.4.3-dev",
   "description": "Control your Denon speakers via AVR Control and/or HeosCLI",
   "author": "hov3rcraft",
   "license": "MIT",
@@ -29,7 +29,7 @@
   "main": "dist/index.js",
   "engines": {
     "node": "^20.18.0 || ^22.10.0 || ^24.0.0",
-    "homebridge": "^1.8.0 || ^2.0.0-beta.0"
+    "homebridge": "^1.8.0 || ^2.1.0"
   },
   "scripts": {
     "build": "rimraf ./dist && tsc",
@@ -42,7 +42,7 @@
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^22.8.6",
     "eslint": "^9.14.0",
-    "homebridge": "^2.0.0-beta.0",
+    "homebridge": "^2.1.0",
     "nodemon": "^3.1.7",
     "rimraf": "^6.0.1",
     "ts-node": "^10.9.2",
